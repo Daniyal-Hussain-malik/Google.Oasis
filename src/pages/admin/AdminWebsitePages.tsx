@@ -1517,33 +1517,145 @@ export function AdminSiteSettingsPage() {
 /* ---------------- 3. Website Insights & Staff Accounts ---------------- */
 
 export function AdminInsightsPage() {
+  const [days, setDays] = useState('30');
   const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await adminApi(`/admin/insights?days=${days}`);
+      setData(res);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [days]);
 
   useEffect(() => {
-    adminApi('/admin/insights?days=30').then(setData).catch((err) => toast.error(err.message));
-  }, []);
+    load();
+  }, [load]);
+
+  const totalViews = data?.counts?.view ?? 0;
 
   return (
     <AdminLayout title="Website Insights">
       <div className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Card><CardContent className="p-5"><p className="text-xs text-muted-foreground">30d Page Views</p><p className="mt-1 font-mono text-2xl font-semibold">{data?.views ?? '—'}</p></CardContent></Card>
-          <Card><CardContent className="p-5"><p className="text-xs text-muted-foreground">Unique Sessions</p><p className="mt-1 font-mono text-2xl font-semibold">{data?.sessions ?? '—'}</p></CardContent></Card>
-          <Card><CardContent className="p-5"><p className="text-xs text-muted-foreground">Avg Dwell (sec)</p><p className="mt-1 font-mono text-2xl font-semibold">{data?.avgDwellSec ?? '—'}</p></CardContent></Card>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="font-display text-3xl font-semibold">Visitor Behaviour &amp; Funnel</h1>
+            <p className="text-sm text-muted-foreground">
+              Page views, room interest, booking drop-off rate, and exit feedback.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={days} onValueChange={setDays}>
+              <SelectTrigger className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Last 7 days</SelectItem>
+                <SelectItem value="30">Last 30 days</SelectItem>
+                <SelectItem value="90">Last 90 days</SelectItem>
+                <SelectItem value="180">Last 180 days</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+              <RefreshCw className="h-4 w-4" /> Refresh
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-xs text-muted-foreground">{days}d Page Views</p>
+              <p className="mt-1 font-mono text-2xl font-semibold tabular-nums">{data ? totalViews : '—'}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-xs text-muted-foreground">Unique Sessions</p>
+              <p className="mt-1 font-mono text-2xl font-semibold tabular-nums">{data?.sessions ?? '—'}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-xs text-muted-foreground">Website Bookings / Conversion</p>
+              <p className="mt-1 font-mono text-2xl font-semibold tabular-nums">
+                {data ? `${data.bookings} (${data.conversion}%)` : '—'}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-xs text-muted-foreground">Booking Form Drop Rate</p>
+              <p className="mt-1 font-mono text-2xl font-semibold tabular-nums">
+                {data ? `${data.bookingDropRate}%` : '—'}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader><CardTitle className="text-lg">Top Pages Viewed</CardTitle></CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader><TableRow><TableHead>Path</TableHead><TableHead className="text-right">Views</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {(data?.topPages || []).map((p: any) => (
+                    <TableRow key={p._id}>
+                      <TableCell className="font-mono text-sm">{p._id}</TableCell>
+                      <TableCell className="text-right font-mono tabular-nums">{p.views}</TableCell>
+                    </TableRow>
+                  ))}
+                  {(!data?.topPages || data.topPages.length === 0) && (
+                    <TableRow><TableCell colSpan={2} className="py-6 text-center text-muted-foreground">No page view data yet.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-lg">Most Viewed Room Categories</CardTitle></CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader><TableRow><TableHead>Room Category</TableHead><TableHead className="text-right">Views</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {(data?.rooms || []).map((r: any) => (
+                    <TableRow key={r._id}>
+                      <TableCell className="text-sm font-medium">{r._id}</TableCell>
+                      <TableCell className="text-right font-mono tabular-nums">{r.views}</TableCell>
+                    </TableRow>
+                  ))}
+                  {(!data?.rooms || data.rooms.length === 0) && (
+                    <TableRow><TableCell colSpan={2} className="py-6 text-center text-muted-foreground">No room category views recorded yet.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </div>
 
         <Card>
-          <CardHeader><CardTitle className="text-lg">Top Pages Viewed</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-lg">Visitor Exit Reasons</CardTitle></CardHeader>
           <CardContent className="p-0">
             <Table>
-              <TableHeader><TableRow><TableHead>Path</TableHead><TableHead className="text-right">Views</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Reason</TableHead><TableHead>Notes</TableHead><TableHead className="text-right">Count</TableHead></TableRow></TableHeader>
               <TableBody>
-                {(data?.topPages || []).map((p: any) => (
-                  <TableRow key={p.path}>
-                    <TableCell className="font-mono text-sm">{p.path}</TableCell>
-                    <TableCell className="text-right font-mono">{p.views}</TableCell>
+                {(data?.exitReasons || []).map((er: any) => (
+                  <TableRow key={er.reason}>
+                    <TableCell className="font-medium capitalize">{String(er.reason || 'other').replaceAll('_', ' ')}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{(er.notes || []).join(' · ') || '—'}</TableCell>
+                    <TableCell className="text-right font-mono tabular-nums">{er.count}</TableCell>
                   </TableRow>
                 ))}
+                {(!data?.exitReasons || data.exitReasons.length === 0) && (
+                  <TableRow><TableCell colSpan={3} className="py-6 text-center text-muted-foreground">No exit feedback recorded in this window.</TableCell></TableRow>
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -1553,13 +1665,33 @@ export function AdminInsightsPage() {
   );
 }
 
+const ROLE_CARDS = [
+  {
+    role: 'Super Admin',
+    desc: 'Full control over rates, Website CMS, staff logins, refunds, night audit, folio reversals, and restaurant settings.',
+  },
+  {
+    role: 'Front Desk',
+    desc: 'Check-ins, check-outs, walk-in bookings, guest enquiries, payment proof verification, and restaurant POS.',
+  },
+  {
+    role: 'Kitchen Chef',
+    desc: 'Real-time Kitchen Display (KDS), KOT ticket progression, and the 86 / Sold-Out board.',
+  },
+];
+
 export function AdminUsersPage() {
+  const { user: currentUser } = useAdminAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('frontdesk');
+  const [editPassword, setEditPassword] = useState('');
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
     adminApi<any>('/admin/users')
@@ -1573,6 +1705,7 @@ export function AdminUsersPage() {
 
   async function addStaff(e: React.FormEvent) {
     e.preventDefault();
+    setBusy(true);
     try {
       await adminApi('/admin/users', { method: 'POST', body: { name, email, password, role } });
       setName('');
@@ -1583,6 +1716,46 @@ export function AdminUsersPage() {
       load();
     } catch (err: any) {
       toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editing) return;
+    setBusy(true);
+    try {
+      const id = editing._id || editing.id;
+      const body: Record<string, unknown> = {
+        name: editing.name,
+        role: editing.role,
+      };
+      if (editPassword.trim()) body.password = editPassword.trim();
+      await adminApi(`/admin/users/${id}`, { method: 'PATCH', body });
+      toast.success('Staff account updated');
+      setEditing(null);
+      setEditPassword('');
+      load();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setBusy(true);
+    try {
+      await adminApi(`/admin/users/${deleteTarget._id || deleteTarget.id}`, { method: 'DELETE' });
+      toast.success('Staff account deleted');
+      setDeleteTarget(null);
+      load();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -1609,19 +1782,78 @@ export function AdminUsersPage() {
           </Button>
         </div>
 
+        <div className="grid gap-4 md:grid-cols-3">
+          {ROLE_CARDS.map((rc) => (
+            <Card key={rc.role}>
+              <CardContent className="p-4 space-y-1">
+                <p className="text-sm font-semibold">{rc.role}</p>
+                <p className="text-xs text-muted-foreground">{rc.desc}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
         <Card>
           <CardContent className="p-0">
             <Table>
-              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Active</TableHead></TableRow></TableHeader>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Last Login</TableHead>
+                  <TableHead>Active</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
               <TableBody>
-                {users.map((u) => (
-                  <TableRow key={u._id || u.id}>
-                    <TableCell className="font-medium">{u.name}</TableCell>
-                    <TableCell className="font-mono text-xs">{u.email}</TableCell>
-                    <TableCell className="text-sm">{ROLE_LABELS[u.role] || u.role}</TableCell>
-                    <TableCell><Switch checked={u.active !== false} onCheckedChange={() => toggleActive(u._id || u.id, u.active !== false)} /></TableCell>
-                  </TableRow>
-                ))}
+                {users.map((u) => {
+                  const id = u._id || u.id;
+                  const isSelf = String(id) === String(currentUser?.id ?? (currentUser as any)?._id ?? '');
+                  return (
+                    <TableRow key={id}>
+                      <TableCell className="font-medium">
+                        {u.name}
+                        {isSelf && <span className="ml-2 text-xs text-accent">(You)</span>}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{u.email}</TableCell>
+                      <TableCell className="text-sm">{ROLE_LABELS[u.role] || u.role}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' }) : 'Never'}
+                      </TableCell>
+                      <TableCell>
+                        <Switch
+                          disabled={isSelf}
+                          checked={u.active !== false}
+                          onCheckedChange={() => toggleActive(id, u.active !== false)}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right space-x-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditPassword('');
+                            setEditing({ ...u });
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        {!isSelf && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive"
+                            onClick={() => setDeleteTarget(u)}
+                            aria-label={`Delete ${u.name}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
@@ -1634,7 +1866,7 @@ export function AdminUsersPage() {
           <form onSubmit={addStaff} className="space-y-4">
             <div className="space-y-1.5"><Label>Full Name</Label><Input required value={name} onChange={(e) => setName(e.target.value)} /></div>
             <div className="space-y-1.5"><Label>Email</Label><Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-            <div className="space-y-1.5"><Label>Temporary Password</Label><Input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+            <div className="space-y-1.5"><Label>Temporary Password (min 8 chars)</Label><Input type="password" minLength={8} required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
             <div className="space-y-1.5">
               <Label>Role</Label>
               <Select value={role} onValueChange={setRole}>
@@ -1648,9 +1880,68 @@ export function AdminUsersPage() {
             </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setCreating(false)}>Cancel</Button>
-              <Button type="submit" variant="accent">Create Account</Button>
+              <Button type="submit" variant="accent" disabled={busy}>Create Account</Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(editing)} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit {editing?.name}</DialogTitle>
+            <DialogDescription>{editing?.email}</DialogDescription>
+          </DialogHeader>
+          {editing && (
+            <form onSubmit={saveEdit} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Full Name</Label>
+                <Input required value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Role</Label>
+                <Select value={editing.role} onValueChange={(v) => setEditing({ ...editing, role: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="frontdesk">Front Desk</SelectItem>
+                    <SelectItem value="chef">Kitchen Chef</SelectItem>
+                    <SelectItem value="super_admin">Super Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Reset Password (leave blank to keep current)</Label>
+                <Input
+                  type="password"
+                  minLength={8}
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  placeholder="Min 8 characters if changing"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+                <Button type="submit" variant="accent" disabled={busy}>Save Changes</Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(deleteTarget)} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove Staff Account?</DialogTitle>
+            <DialogDescription>
+              Delete login for {deleteTarget?.name} ({deleteTarget?.email})? They will immediately lose portal access.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button type="button" variant="destructive" disabled={busy} onClick={confirmDelete}>
+              {busy ? 'Removing…' : 'Delete Account'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </AdminLayout>

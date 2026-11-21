@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Rating } from '@mui/material';
+import { motion } from 'motion/react';
 import {
   ArrowRight,
   Calendar,
@@ -13,6 +14,8 @@ import {
   Users,
 } from 'lucide-react';
 import { GuestLayout } from '@/src/components/guest/GuestLayout';
+import { HeroCarousel, type HeroSlide } from '@/src/components/guest/HeroCarousel';
+import { StoryPhotoCarousel, type StorySlide } from '@/src/components/guest/StoryPhotoCarousel';
 import { FacilityShowcase } from '@/src/components/guest/FacilitySection';
 import { EnquiryForm } from '@/src/components/guest/EnquiryForm';
 import { ResilientImage } from '@/src/components/guest/ResilientImage';
@@ -37,6 +40,8 @@ export function HomePage() {
   const [reviews, setReviews] = useState<Array<{ guestName: string; rating: number; comment: string }>>([]);
   const [showPromo, setShowPromo] = useState(false);
   const [promoCode, setPromoCode] = useState('');
+  const bookingCardRef = useRef<HTMLDivElement>(null);
+  const [bookingHalfHeight, setBookingHalfHeight] = useState(60);
   const [form, setForm] = useState({
     checkIn: todayISO(),
     checkOut: addDays(todayISO(), 2),
@@ -72,6 +77,20 @@ export function HomePage() {
         if (Array.isArray(rows) && rows.length) setReviews(rows.slice(0, 3));
       })
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const el = bookingCardRef.current;
+    if (!el) return;
+    const syncHalfHeight = () => {
+      const h = el.getBoundingClientRect().height;
+      if (h > 0) setBookingHalfHeight(Math.round(h / 2));
+    };
+    syncHalfHeight();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(syncHalfHeight);
+    observer.observe(el);
+    return () => observer.disconnect();
   }, []);
 
   function updateCheckIn(value: string) {
@@ -111,40 +130,93 @@ export function HomePage() {
     ? reviews
     : defaultReviews.map(([guestName, comment]) => ({ guestName, rating: 5, comment }));
 
+  const heroSlides: HeroSlide[] = [
+    {
+      src: photos.wide,
+      alt: 'Glass-fronted huts on the Katpana cold desert with the Karakoram peaks behind',
+      label: 'Katpana Cold Desert',
+      caption: 'Glass-fronted timber huts facing the Karakoram',
+      objectPosition: 'object-[center_62%]',
+    },
+    {
+      src: official.desertK2,
+      alt: 'Sunset on the Katpana dunes with high mountain peaks behind Oasis Resort Skardu',
+      label: 'Dunes & Peaks',
+      caption: 'Evening light over the Skardu dunes',
+      objectPosition: 'object-center',
+    },
+    {
+      src: official.landscape,
+      alt: 'The full Oasis Resort grounds across the Katpana desert valley',
+      label: 'Oasis Grounds',
+      caption: 'Low timber chalets set across the sand',
+      objectPosition: 'object-center',
+    },
+    {
+      src: photos.panorama,
+      alt: 'The full row of huts at Oasis Resort Skardu in winter light',
+      label: 'Skardu Winter',
+      caption: 'Heated huts overlooking the snow ridge',
+      objectPosition: 'object-[center_58%]',
+    },
+  ];
+
+  const storySlides: StorySlide[] = [
+    {
+      src: photos.row,
+      alt: 'The row of huts facing the Katpana snowfield',
+      caption: 'The row, facing the Katpana dune. Check-in is from 2:00 PM.',
+    },
+    {
+      src: photos.snow,
+      alt: 'Winter light along the red roofs of Oasis Resort Skardu',
+      caption: 'Winter light along the red roofs — heated huts before you arrive.',
+    },
+    {
+      src: photos.cloud,
+      alt: 'Timber cottages set against bare Katpana dunes and cloud cover',
+      caption: 'The same hut row when the desert sand is clear beneath the peaks.',
+    },
+    {
+      src: official.rooms,
+      alt: 'Walkway along the chalet terrace looking out toward the Karakoram',
+      caption: 'Glass fronts opening straight onto 165 kanals of cold desert.',
+    },
+  ];
+
   return (
     <GuestLayout>
-      {/* 1. Hero Showcase with Ambient Video + Katpana Fallback Image */}
-      <section className="relative min-h-[78vh] overflow-hidden bg-primary">
-        <ResilientImage
-          src={photos.wide}
-          alt="Glass-fronted huts on the Katpana cold desert with the Karakoram peaks behind"
-          className="absolute inset-0 h-full w-full object-cover object-[center_62%]"
-        />
-        <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-80" aria-hidden="true">
-          <iframe
-            className="absolute left-1/2 top-1/2 h-[56.25vw] min-h-full w-[177.78vh] min-w-full -translate-x-1/2 -translate-y-1/2"
-            src="https://www.youtube-nocookie.com/embed/f-Fku28RQWM?autoplay=1&mute=1&loop=1&playlist=f-Fku28RQWM&controls=0&modestbranding=1&rel=0&playsinline=1&disablekb=1&fs=0&iv_load_policy=3"
-            title="Oasis Resort Skardu"
-            tabIndex={-1}
-            allow="autoplay; encrypted-media"
-          />
-        </div>
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/25" />
-
-        <div className="relative z-10 mx-auto flex min-h-[78vh] max-w-7xl flex-col justify-between px-4 pb-10 pt-20 sm:px-6 lg:px-8">
-          <div className="max-w-2xl pt-8 text-white">
-            <p className="text-xs font-medium uppercase tracking-[0.22em] text-amber-300/95">
+      {/* 1. Hero Showcase with 4-Image Shadcn + Material UI Carousel */}
+      <HeroCarousel slides={heroSlides}>
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+          className="mb-auto max-w-2xl pt-2 text-white"
+        >
+          <div className="flex items-center gap-3">
+            <span aria-hidden="true" className="h-[1px] w-8 bg-amber-300/85" />
+            <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-amber-200/95 drop-shadow-[0_1px_6px_rgba(0,0,0,0.6)] sm:text-xs">
               {t.kicker}
             </p>
-            <h1 className="font-display mt-3 text-5xl font-semibold leading-[1.05] text-white sm:text-6xl lg:text-7xl">
-              {site?.heroTitle || t.hero}
-            </h1>
-            <p className="mt-4 max-w-xl text-base leading-relaxed text-white/85 sm:text-lg">
-              {site?.heroLede || t.heroBody}
-            </p>
           </div>
+          <h1 className="font-display mt-3.5 text-5xl font-medium leading-[0.98] tracking-[-0.02em] text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.45)] sm:text-7xl lg:text-[5.25rem]">
+            {site?.heroTitle || t.hero}
+          </h1>
+          <p className="mt-5 max-w-xl border-l border-amber-300/60 pl-4 text-base font-normal leading-relaxed tracking-[0.01em] text-white/90 drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)] sm:text-lg lg:text-[1.2rem]">
+            {site?.heroLede || t.heroBody}
+          </p>
+        </motion.div>
+      </HeroCarousel>
 
-          <Card className="mt-10 border-white/20 bg-card/95 shadow-2xl backdrop-blur-md">
+      {/* 2. Seam-Centered Booking Bar (exact 50/50 bridge between Section 1 & Section 2) + Assurance Strip */}
+      <section className="relative flow-root border-b border-border bg-card">
+        <div
+          ref={bookingCardRef}
+          style={{ marginTop: -bookingHalfHeight }}
+          className="relative z-20 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"
+        >
+          <Card className="border-border/80 bg-card/98 shadow-2xl backdrop-blur-md">
             <CardContent className="p-4 sm:p-5">
               <form onSubmit={handleSearch} className="space-y-3">
                 <div className="grid gap-3 md:grid-cols-[1.4fr_1fr_auto] md:items-end">
@@ -259,11 +331,8 @@ export function HomePage() {
             </CardContent>
           </Card>
         </div>
-      </section>
 
-      {/* 2. Assurance Strip */}
-      <section className="border-b border-border bg-card">
-        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-6 px-4 py-8 sm:px-6 md:grid-cols-4 lg:px-8">
+        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-6 px-4 pb-8 pt-8 sm:px-6 md:grid-cols-4 lg:px-8">
           {[
             { icon: <Coffee className="h-5 w-5 text-accent" />, title: 'Breakfast included', sub: 'In every direct room rate' },
             { icon: <Flame className="h-5 w-5 text-accent" />, title: 'Heated before arrival', sub: 'Warm huts throughout winter' },
@@ -318,16 +387,7 @@ export function HomePage() {
             </div>
           </div>
 
-          <Card className="overflow-hidden">
-            <ResilientImage
-              src={photos.row}
-              alt="The row of huts facing the snowfield"
-              className="h-72 w-full object-cover"
-            />
-            <CardContent className="p-4 text-xs text-muted-foreground">
-              The row, facing the Katpana dune. Check-in is from 2:00 PM.
-            </CardContent>
-          </Card>
+          <StoryPhotoCarousel slides={storySlides} />
         </div>
       </section>
 

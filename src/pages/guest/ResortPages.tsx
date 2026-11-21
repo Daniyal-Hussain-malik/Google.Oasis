@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Rating } from '@mui/material';
-import { MapPin, Phone, Mail, ExternalLink } from 'lucide-react';
+import { ExternalLink, Mail, MapPin, Phone } from 'lucide-react';
 import { GuestLayout } from '@/src/components/guest/GuestLayout';
 import { FacilityShowcase } from '@/src/components/guest/FacilitySection';
 import { EnquiryForm } from '@/src/components/guest/EnquiryForm';
@@ -10,8 +10,9 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent } from '@/src/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
+import { useI18n } from '@/src/context/I18nContext';
 import { api, media } from '@/src/lib/api';
-import { defaultReviews, faqs, gallery, photos } from '@/src/data/resortContent';
+import { defaultReviews, faqGroups, gallery, photos, tourStops } from '@/src/data/resortContent';
 
 function PageHeader({ kicker, title, lede }: { kicker: string; title: string; lede?: string }) {
   return (
@@ -26,7 +27,7 @@ function PageHeader({ kicker, title, lede }: { kicker: string; title: string; le
 export function FacilitiesPage() {
   return (
     <GuestLayout>
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 space-y-12">
         <PageHeader
           kicker="Facilities"
           title="Built for the Katpana desert"
@@ -60,7 +61,7 @@ export function ActivitiesPage() {
 
   return (
     <GuestLayout>
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 space-y-10">
         <PageHeader
           kicker="Activities"
           title="Desert days & starlit evenings"
@@ -81,6 +82,12 @@ export function ActivitiesPage() {
             </Card>
           ))}
         </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card><CardContent className="p-5"><p className="text-xs uppercase tracking-wider text-muted-foreground">Cinema</p><p className="font-display mt-1 text-2xl font-semibold">Free</p><p className="text-xs text-muted-foreground mt-1">Weather permitting</p></CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-xs uppercase tracking-wider text-muted-foreground">Boards</p><p className="font-display mt-1 text-2xl font-semibold">At desk</p><p className="text-xs text-muted-foreground mt-1">No hire counter</p></CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-xs uppercase tracking-wider text-muted-foreground">Jeep</p><p className="font-display mt-1 text-2xl font-semibold">Charged</p><p className="text-xs text-muted-foreground mt-1">Posted to the room</p></CardContent></Card>
+          <Card><CardContent className="p-5"><p className="text-xs uppercase tracking-wider text-muted-foreground">Court</p><p className="font-display mt-1 text-2xl font-semibold">On site</p><p className="text-xs text-muted-foreground mt-1">Ask for a time</p></CardContent></Card>
+        </div>
       </div>
     </GuestLayout>
   );
@@ -91,12 +98,12 @@ export function GalleryPage() {
 
   return (
     <GuestLayout>
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 space-y-10">
         <PageHeader kicker="Gallery" title="Inside Oasis Resort" lede="The dunes, the red-roofed huts, and the kitchen." />
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
           {gallery.map(([src, alt]) => (
             <button
-              key={src}
+              key={src + alt}
               type="button"
               onClick={() => setActive({ src, alt })}
               className="group overflow-hidden rounded-xl border border-border bg-card text-left cursor-pointer"
@@ -134,20 +141,28 @@ export function GalleryPage() {
 export function FaqPage() {
   return (
     <GuestLayout>
-      <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
+      <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 space-y-8">
         <PageHeader kicker="FAQ" title="Before you travel" />
-        <Card>
-          <CardContent className="p-6">
-            <Accordion type="single" collapsible className="w-full">
-              {faqs.map(([q, a], idx) => (
-                <AccordionItem key={q} value={`faq-${idx}`}>
-                  <AccordionTrigger>{q}</AccordionTrigger>
-                  <AccordionContent>{a}</AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </CardContent>
-        </Card>
+        <div className="space-y-6">
+          {faqGroups.map((group) => (
+            <Card key={group.title}>
+              <CardContent className="p-6 space-y-4">
+                <div>
+                  <h2 className="font-display text-2xl font-semibold">{group.title}</h2>
+                  <p className="text-xs text-muted-foreground">{group.lede}</p>
+                </div>
+                <Accordion type="single" collapsible className="w-full">
+                  {group.items.map(([q, a], idx) => (
+                    <AccordionItem key={q} value={`${group.title}-${idx}`}>
+                      <AccordionTrigger>{q}</AccordionTrigger>
+                      <AccordionContent>{a}</AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     </GuestLayout>
   );
@@ -156,7 +171,7 @@ export function FaqPage() {
 export function DirectionsPage() {
   return (
     <GuestLayout>
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 space-y-6">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 space-y-8">
         <PageHeader
           kicker="Directions"
           title="Fifteen minutes from Skardu Airport"
@@ -174,6 +189,11 @@ export function DirectionsPage() {
             />
           </div>
         </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card><CardContent className="p-5 space-y-1"><p className="font-mono text-xs text-accent">01 · Airport</p><h3 className="font-semibold">Land at Skardu</h3><p className="text-sm text-muted-foreground">On stays of 3+ nights, a driver waits with your name. Send your flight number.</p></CardContent></Card>
+          <Card><CardContent className="p-5 space-y-1"><p className="font-mono text-xs text-accent">02 · The Road</p><h3 className="font-semibold">Toward Katpana</h3><p className="text-sm text-muted-foreground">Ask for Oasis Resort, Katpana cold desert—not Shangrila Lake.</p></CardContent></Card>
+          <Card><CardContent className="p-5 space-y-1"><p className="font-mono text-xs text-accent">03 · Arrival</p><h3 className="font-semibold">The red roofs</h3><p className="text-sm text-muted-foreground">Private parking on site. Check-in is from 2:00 PM at the reception hut.</p></CardContent></Card>
+        </div>
         <Button asChild variant="outline">
           <a href="https://maps.google.com/?q=Katpana+Cold+Desert+Skardu" target="_blank" rel="noreferrer">
             <ExternalLink className="h-4 w-4" />
@@ -186,36 +206,36 @@ export function DirectionsPage() {
 }
 
 export function TourPage() {
-  const stops = [
-    [photos.row, 'Arrival along the red-roofed row. Check-in opens at 2:00 PM.'],
-    [photos.deluxeDay, 'Deluxe rooms face the desert ridge with carved wood beds and breakfast included.'],
-    [photos.nook, 'Afternoon tea at the valley-facing window nook.'],
-    [photos.breakfast, 'Fresh breakfast tray delivered directly to your hut.'],
-    [photos.bonfire, 'Evening bonfire and dinner service on calm nights.'],
-    [photos.wide, 'In winter, snow blankets the dunes right outside your glass terrace.'],
-  ];
-
   return (
     <GuestLayout>
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 space-y-8">
         <PageHeader
           kicker="Virtual Tour"
           title="Walk the dune side before you arrive"
           lede="Arrival, the hut interiors, morning trays, and evenings on the sand."
         />
         <div className="grid gap-6 md:grid-cols-2">
-          {stops.map(([src, caption]) => (
-            <Card key={caption} className="overflow-hidden">
+          {tourStops.map((stop) => (
+            <Card key={stop.title} className="overflow-hidden">
               <div className="h-64">
-                <ResilientImage src={src} alt={caption} className="h-full w-full object-cover" />
+                <ResilientImage src={stop.image} alt={stop.title} className="h-full w-full object-cover" />
               </div>
-              <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground">{caption}</p>
+              <CardContent className="p-6 space-y-3">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider text-accent">{stop.kicker}</p>
+                  <h2 className="font-display text-2xl font-semibold mt-0.5">{stop.title}</h2>
+                </div>
+                <p className="text-sm leading-relaxed text-muted-foreground">{stop.body}</p>
+                <ul className="space-y-1 text-xs text-muted-foreground border-t border-border pt-3">
+                  {stop.points.map((pt) => (
+                    <li key={pt}>· {pt}</li>
+                  ))}
+                </ul>
               </CardContent>
             </Card>
           ))}
         </div>
-        <div className="mt-8">
+        <div>
           <Button asChild variant="accent">
             <Link to="/rooms">Explore Available Huts</Link>
           </Button>
@@ -231,8 +251,8 @@ export function ContactPage() {
       <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6">
         <PageHeader
           kicker="Contact"
-          title="Speak directly with the resort desk"
-          lede="0344-5537788 · 0355-4114567 · oasisresortskardu@gmail.com"
+          title="Three numbers, one email."
+          lede="0344-5537788 · 0308-1472888 · 0355-4114567 · oasisresortskardu@gmail.com"
         />
         <EnquiryForm topic="Contact" prompt="Send your travel dates, flight details, or group requests." />
       </div>
@@ -241,6 +261,7 @@ export function ContactPage() {
 }
 
 export function VisitPage() {
+  const { t } = useI18n();
   const [hotel, setHotel] = useState<any>(null);
   useEffect(() => {
     api('/public/hotel').then(setHotel).catch(() => {});
@@ -248,33 +269,68 @@ export function VisitPage() {
 
   return (
     <GuestLayout>
-      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8 space-y-8">
-        <PageHeader kicker="Visit" title="Come to Katpana" lede={hotel?.address || 'Cold desert, Katpana, Skardu 16100'} />
-        <div className="grid gap-6 md:grid-cols-3">
-          <Card>
-            <CardContent className="p-6 space-y-2">
-              <MapPin className="h-5 w-5 text-accent" />
-              <h2 className="font-semibold">Address</h2>
-              <p className="text-sm text-muted-foreground">{hotel?.address || 'Cold desert, Katpana, Skardu 16100, Gilgit-Baltistan'}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-6 space-y-2">
-              <Phone className="h-5 w-5 text-accent" />
-              <h2 className="font-semibold">Desk Phones</h2>
-              <p className="font-mono text-sm text-muted-foreground tabular-nums">
-                {(hotel?.phones || ['0344-5537788', '0355-4114567']).join(' · ')}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-6 space-y-2">
-              <Mail className="h-5 w-5 text-accent" />
-              <h2 className="font-semibold">Email</h2>
-              <p className="text-sm text-muted-foreground">{hotel?.email || 'oasisresortskardu@gmail.com'}</p>
-            </CardContent>
-          </Card>
+      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8 space-y-10">
+        <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
+          <div className="space-y-6">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider text-accent">{t.visit}</p>
+              <h1 className="font-display mt-2 text-4xl font-semibold sm:text-5xl">{t.visitTitle}</h1>
+              {hotel?.policies && (
+                <p className="mt-3 text-base leading-relaxed text-muted-foreground">{hotel.policies}</p>
+              )}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Card>
+                <CardContent className="p-4 space-y-1.5">
+                  <MapPin className="h-4 w-4 text-accent" />
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Address</p>
+                  <p className="text-sm">{hotel?.address || t.address}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4 space-y-1.5">
+                  <Phone className="h-4 w-4 text-accent" />
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phone</p>
+                  <p className="font-mono text-sm tabular-nums">{hotel?.phone || '0344-5537788'}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4 space-y-1.5">
+                  <Mail className="h-4 w-4 text-accent" />
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Email</p>
+                  <p className="text-sm break-all">{hotel?.email || 'oasisresortskardu@gmail.com'}</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[t.policy1, t.policy2, t.policy3].map((item) => (
+                <Card key={item}>
+                  <CardContent className="p-4 text-sm text-foreground">{item}</CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {hotel?.childPolicy && (
+              <Card>
+                <CardContent className="p-4 text-sm text-muted-foreground">
+                  <span className="font-semibold text-foreground">Children &amp; Extra Bed: </span>
+                  {hotel.childPolicy}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <iframe
+              title="Oasis Resort Map"
+              className="h-[420px] w-full border-0"
+              src="https://maps.google.com/maps?q=Katpana%20Cold%20Desert%20Skardu&z=12&output=embed"
+            />
+          </div>
         </div>
+
         <EnquiryForm topic="Visit" title="Plan your arrival" />
       </div>
     </GuestLayout>
@@ -294,9 +350,9 @@ export function ReviewsPage() {
 
   return (
     <GuestLayout>
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 space-y-10">
         <PageHeader kicker="Guest Reviews" title="From guests who booked direct" />
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {combined.map((rev, idx) => (
             <Card key={idx}>
               <CardContent className="flex h-full flex-col justify-between p-6 space-y-4">
@@ -316,15 +372,15 @@ export function ReviewsPage() {
 
 export function EventsPage() {
   const items = [
-    [photos.bonfire, 'Bonfire evenings', 'Lit on calm nights after dinner. Request at reception by 6:00 PM.'],
+    [photos.bonfire, 'Bonfire evenings', 'After dinner, on the dune, if you told the desk by six. Wood and chairs for the number you gave.'],
     [photos.panorama, 'Winter dune stays', 'Heated glass huts with direct winter rates and warm arrival preparation.'],
-    [photos.night, 'Open-air cinema', 'Announced at breakfast on clear nights with zero extra charge.'],
+    [photos.night, 'Open-air cinema', 'Announced at breakfast the same day. Cancelled if the wind is up. The film moves inside or not at all.'],
   ];
 
   return (
     <GuestLayout>
       <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
-        <PageHeader kicker="Events" title="Evenings & seasonal gatherings" />
+        <PageHeader kicker="Events" title="Nothing here needs a ticket." />
         <div className="space-y-6">
           {items.map(([src, title, body]) => (
             <Card key={title} className="overflow-hidden">

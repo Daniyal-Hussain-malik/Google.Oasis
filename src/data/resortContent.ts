@@ -70,6 +70,7 @@ export const gallery: Array<[string, string]> = [
   [photos.cloud, 'The same huts when the desert is bare'],
   [photos.deluxeDay, 'Deluxe room in the morning'],
   [photos.viewFromBed, 'The dune from the bed'],
+  [photos.executive, 'Executive room, with the valley through the glass'],
   [photos.windowChairs, 'Armchairs at the valley window'],
   [photos.lounge, 'The sitting corner and the kilim'],
   [photos.nook, 'The window seat'],
@@ -77,13 +78,16 @@ export const gallery: Array<[string, string]> = [
   [photos.deluxeNight, 'The room after dark'],
   [photos.roomNight, 'Terrace doors after dark'],
   [photos.redRoom, 'The red-wall room'],
+  [photos.redTv, 'Television beside the red wall'],
   [photos.carved, 'Detail of the carved bed'],
+  [photos.tv, 'The in-room television'],
   [photos.breakfast, 'Breakfast sent to the room'],
   [photos.cafe, 'Picnic tables at the outdoor cafe'],
   [photos.fire, 'The bonfire on the sand'],
   [photos.bonfire, 'Lights between the huts'],
   [photos.night, 'The huts lit after dark'],
   [photos.stars, 'The sky above the desert'],
+  [photos.jeep, 'The jeep at the door after dark'],
   [photos.shangrila, 'Shangrila Lake at Lower Kachura, a day out from the resort'],
 ];
 
@@ -103,8 +107,8 @@ const stayOverrides = [
   {
     match: /family/i,
     image: photos.redRoom,
-    description: 'Room for four adults and three children: a carved king bed, a second bed, a kilim, and the heater already on in winter.',
-    amenities: ['Terrace doors', 'King and twin beds', 'Oasis linen', 'Heater', 'Extra mattress on request'],
+    description: 'The red-wall room: a carved bed, a kilim, and air conditioning. An extra mattress is PKR 2,500 if you ask the desk ahead.',
+    amenities: ['Terrace doors', 'King bed', 'Oasis linen', 'Heater', 'Extra mattress on request'],
   },
   {
     match: /twin|superior/i,
@@ -124,9 +128,11 @@ export function presentStay(room: any) {
   if (!room) return room;
   const hit = stayOverrides.find((item) => item.match.test(room.name || ''));
   const next = { ...room };
-  if ((!room.image || room.image.includes('unsplash.com')) && hit) next.image = hit.image;
-  if (!room.description && hit) next.description = hit.description;
-  if ((!room.amenities || !room.amenities.length) && hit) next.amenities = hit.amenities;
+  const isStock = !room.image || room.image.includes('unsplash.com');
+  const isSeededCopy = /courtyard|mall|empress|civil lines/i.test(room.description || '');
+  if (isStock && hit) next.image = hit.image;
+  if ((!room.description || isSeededCopy) && hit) next.description = hit.description;
+  if ((!room.amenities || !room.amenities.length || isSeededCopy) && hit) next.amenities = hit.amenities;
   next.image = media(next.image);
   return next;
 }
@@ -275,7 +281,57 @@ export const restaurants: EditorialItem[] = [
     kicker: 'Until eleven',
     image: photos.nook,
     summary: 'The same kitchen, brought to the room. It posts to the folio before you sleep.',
-    body: 'Call the desk or order online using your booking number. Breakfast can come this way at no extra charge. Lunch and dinner are charged. If you are not in house, the tray is not available.',
+    body: 'Call the desk. There is no separate app and no separate bill. Breakfast can come this way at no extra charge. Lunch and dinner are charged. If you are not in house, the tray is not available.',
+  },
+];
+
+export const collections = [
+  {
+    slug: 'the-huts',
+    title: 'The huts',
+    kicker: 'On the dune',
+    image: photos.wide,
+    summary: 'Red roofs, glass fronts, and the Karakoram behind the desert.',
+    to: '/gallery',
+  },
+  {
+    slug: 'the-rooms',
+    title: 'The rooms',
+    kicker: 'Carved wood',
+    image: photos.deluxeDay,
+    summary: 'King beds, valley windows, and heaters that are already on when you arrive in winter.',
+    to: '/stay',
+  },
+  {
+    slug: 'the-table',
+    title: 'Breakfast and dinner',
+    kicker: 'One kitchen',
+    image: photos.breakfast,
+    summary: 'Breakfast is included. Dinner can be on the sand or brought to the hut.',
+    to: '/dining',
+  },
+  {
+    slug: 'after-dark',
+    title: 'After dark',
+    kicker: 'On the sand',
+    image: photos.bonfire,
+    summary: 'A fire, a jeep if you asked, and lights between the huts.',
+    to: '/experiences',
+  },
+];
+
+export const wellness = [
+  {
+    title: 'Heat, then quiet',
+    body: 'In winter the heater is on before you arrive. The curtains on the valley window are heavy enough to sleep through a bright snow morning. If you want the hut at the end of the row, say so in the booking notes.',
+  },
+  {
+    title: 'Morning on the dune',
+    body: 'The path in front of the huts is the walk. Nobody instructs you. In snow, boots matter more than a yoga mat. The desk will say if the wind makes the open side unpleasant.',
+  },
+  {
+    title: 'Sleep',
+    body: 'The rooms face the desert, not a road. A request for a quieter hut is a note on the booking, honoured when that hut is free. Check-in is from 2:00 PM, so the room is made before you land.',
   },
 ];
 
@@ -302,39 +358,58 @@ export const journals: EditorialItem[] = [
     kicker: 'The desk',
     image: photos.cloud,
     summary: 'The public price is the best price we publish. A member does not see a secret lower one.',
-    body: 'Agencies sell the same huts and keep a commission. If you find a lower public rate for the same room and the same dates, tell the desk before you arrive and we will match it. That is the whole of the guarantee.',
-  },
-];
-
-export const wellness = [
-  {
-    title: 'Heat, then quiet',
-    body: 'In winter the heater is on before you arrive. The curtains on the valley window are heavy enough to sleep through a bright snow morning. If you want the hut at the end of the row, say so in the booking notes.',
-  },
-  {
-    title: 'Morning on the dune',
-    body: 'The path in front of the huts is the walk. Nobody instructs you. In snow, boots matter more than a yoga mat. The desk will say if the wind makes the open side unpleasant.',
-  },
-  {
-    title: 'Sleep',
-    body: 'The rooms face the desert, not a road. A request for a quieter hut is a note on the booking, honoured when that hut is free. Check-in is from 2:00 PM, so the room is made before you land.',
+    body: 'Agencies sell the same huts and keep a commission. If you find a lower public rate for the same room and the same dates, tell the desk before you arrive and we will match it. That is the whole of the guarantee. It does not cover member clubs we do not belong to, or rates that need a coupon we cannot see. The room is held in our own book the moment the booking is confirmed.',
   },
 ];
 
 export const faqs: Array<[string, string]> = [
-  ['How far are you from Skardu airport?', 'About fifteen minutes by road, along the Katpana cold desert edge. For stays of three nights or more, airport pick-up is complimentary.'],
-  ['Is breakfast included in the room rate?', 'Yes, breakfast is included in every room rate—served in the dining hall or sent on a tray to your hut.'],
-  ['Are the huts heated in winter?', 'Yes. Every hut is heated and staff turn the room heaters on before your arrival during colder months.'],
-  ['Can we order food to our room?', 'Yes. Once checked in, use the Order Food portal with your booking number and phone, or call the desk. Charges can post straight to your room folio.'],
-  ['What is the cancellation policy?', 'Cancellation is free until 48 hours before arrival. Inside 48 hours, the first night is charged.'],
-  ['How do Easypaisa and bank transfer payments work?', 'Book your stay first to lock your room, then send your payment and submit the Transaction ID (TID) on the confirmation or lookup page. Our desk verifies and posts it to your folio.'],
-  ['Do you have a step-free accessible room?', 'Room 101 (Deluxe Hut) is step-free. Mention it in your booking notes so the desk prioritizes it.'],
+  ['Where is the resort?', 'Cold desert, Katpana, Skardu 16100, Gilgit-Baltistan. About fifteen minutes from Skardu airport, the row of red roofs on the desert edge.'],
+  ['Is there airport pick-up?', 'On stays of three nights or more, pick-up is included, both ways, for the people named on the booking. Shorter stays can request a car, and that ride is charged. Send the flight number if you want the driver to wait.'],
+  ['Can we drive ourselves?', 'Yes. Private parking is on the grounds. In winter, daylight is the sensible time. The directions page has the map.'],
+  ['What time is check-in and checkout?', 'Check-in is from 2:00 PM. Checkout is by 12:00 PM. A later checkout is a request, confirmed the evening before if the hut is free.'],
+  ['Is breakfast included?', 'Yes. Eggs, toast, tea, and jam, in the restaurant or on a tray if you ask the night before. Lunch and dinner are charged.'],
+  ['Is there an extra bed?', 'A mattress is PKR 2,500. Ask before you arrive so the hut is set up. Children stay with the adults named on the booking.'],
+  ['How do I pay?', 'Cash, card, bank transfer, JazzCash, and Easypaisa at the desk. You can also pay a deposit via bank transfer or Easypaisa and upload your transaction ID from your confirmation or lookup page.'],
+  ['How do I cancel?', 'Free until 48 hours before arrival. After that the first night is kept. A no-show is charged the same way when the night audit runs.'],
+  ['Can dinner be outside?', 'On a calm night, yes. Tell the desk by six if you also want a fire. If the wind is up, dinner is indoors and they will say so.'],
+  ['Is there room service?', 'Until eleven, from the same kitchen. Breakfast on a tray is included. Lunch and dinner on a tray are charged to the folio or orderable online once checked in.'],
+  ['Which room has no step?', 'Room 101. Say so when you book and the desk will hold it if it is free.'],
+  ['Is there Wi-Fi and hot water?', 'Yes. Wi-Fi is complimentary. Hot and cold water runs in the guest accommodation, and the heating covers the room and the washroom.'],
+];
+
+export const faqGroups = [
+  {
+    title: 'Getting here',
+    lede: 'The road is short. The car depends on the length of the stay.',
+    items: faqs.slice(0, 3),
+  },
+  {
+    title: 'The room',
+    lede: 'What is in the rate, and what you should ask for before you land.',
+    items: faqs.slice(3, 6),
+  },
+  {
+    title: 'Money',
+    lede: 'One bill at the end. Transparent direct rates.',
+    items: faqs.slice(6, 8),
+  },
+  {
+    title: 'Food and the evening',
+    lede: 'One kitchen. The sand, if the weather agrees.',
+    items: faqs.slice(8, 10),
+  },
+  {
+    title: 'Families and access',
+    lede: 'The grounds are simple. One room is step-free.',
+    items: faqs.slice(10, 12),
+  },
 ];
 
 export const defaultReviews: Array<[string, string]> = [
-  ['Saad A. · Islamabad', 'Waking up with the Katpana snow dunes right outside the glass windows was surreal. Heater was already warm on arrival.'],
-  ['Mariam K. · Lahore', 'Booked directly on the site and got our three-night airport transfer. Chicken karahi by the evening bonfire made the trip.'],
-  ['Zohaib R. · Karachi', 'Quiet, clean, and genuinely close to the desert without feeling touristy. Room service to the hut was fast.'],
+  ['Sana, from Lahore · Two nights', 'We asked for the quiet end and got it. The executive window faced the valley, not the path. Checkout was noon and the car was already there.'],
+  ['The Qureshis · A family', 'The extra mattress was in the room when we arrived. The children used the play area in the afternoon. Dinner was plain enough for them and still a proper karahi for us.'],
+  ['Bilal · Winter', 'Snow on the dune, heater already on, and the driver waited because the flight was late. We had sent the number the day before.'],
+  ['The Martins · A day out', 'Airport pick-up on a three-night stay was waiting. Sandboarding the same afternoon. Shangrila the next day, home before the fire.'],
 ];
 
 export const policies: Record<string, { title: string; body: string[] }> = {
@@ -350,37 +425,172 @@ export const policies: Record<string, { title: string; body: string[] }> = {
   privacy: {
     title: 'Privacy',
     body: [
-      'We keep the name, phone, email, and identity details you give us so we can hold the room and meet guest-registration rules.',
-      'Card numbers are never collected or stored by Oasis Resort.',
-      'You can ask the desk for a copy of what we hold, or for deletion where tax rules allow it.',
+      'We keep the name, phone, email, and identity details you give us so we can hold the room and meet the guest-registration rules.',
+      'Card numbers typed into the website stay in your browser. The hotel stores a payment reference, not the card.',
+      'Identity scans are stored encrypted. Staff open them only for check-in, and that opening is logged.',
+      'You can ask the desk for a copy of what we hold, or for deletion where the tax rules allow it. Financial records are kept for the period the tax office requires.',
     ],
   },
   cookies: {
     title: 'Cookies',
     body: [
-      'The site stores your language preference and saved booking shortcuts in your browser storage only.',
-      'We do not run third-party advertising cookies or sell guest lists.',
+      'The site stores your language choice and, if you join, your Circle name on this browser. That is local storage, not a tracking network.',
+      'We do not run advertising cookies and we do not sell a guest list.',
+    ],
+  },
+  access: {
+    title: 'Accessibility',
+    body: [
+      'Room 101 is the step-free room. Say so when you book and the desk will hold it if it is free.',
+      'The site can be read with a keyboard. Contrast is set for the sand and palm colours used throughout. If a page fails you, write to oasisresortskardu@gmail.com and name the page.',
     ],
   },
   cancellation: {
     title: 'Cancellation policy',
     body: [
       'You can cancel free of charge until 48 hours before the day of arrival.',
-      'Inside 48 hours, the first night is charged. Write to oasisresortskardu@gmail.com or WhatsApp the desk with your booking number.',
+      'Inside 48 hours, the first night is charged. A booking that is still unarrived when the night audit runs is a no-show and takes the same charge.',
+      'Write to oasisresortskardu@gmail.com or WhatsApp the desk with your booking number.',
     ],
   },
   refund: {
     title: 'Refund policy',
     body: [
-      'A deposit paid by bank transfer or Easypaisa is held against the stay. If you cancel inside the free window, the desk refunds it via the same channel.',
-      'Refunds are approved by a manager and recorded in the audit log.',
+      'A deposit paid on the website is held against the stay. If you cancel inside the free window, the desk refunds it to the same method.',
+      'Refunds are approved by a manager and written into the audit log. Card data is never stored here, so a card refund goes back through the payment gateway.',
+      'Allow a few working days for a bank or wallet refund to show.',
     ],
   },
   'best-rate': {
     title: 'Best rate guarantee',
     body: [
-      'The rate on this website for a room type and dates is the lowest public rate we offer.',
-      'If you find a lower public rate for the exact same dates and room, email oasisresortskardu@gmail.com before arrival and we will match it.',
+      'The rate on this website for a room type and a set of dates is the lowest public rate we offer for that stay.',
+      'If you find a lower rate for the same room type and the same dates, available to book without a private membership, email oasisresortskardu@gmail.com before you arrive. We will match it or explain why it does not qualify.',
+      'Agency rates that hide the hotel name, package rates that include flights, and rates that have already expired do not qualify.',
     ],
   },
 };
+
+export interface GuideFact {
+  label: string;
+  value: string;
+  note?: string;
+}
+
+export interface GuideCard {
+  title: string;
+  body: string;
+}
+
+export const sectionGuides: Record<string, { facts?: GuideFact[]; stepsTitle?: string; steps?: GuideCard[]; cardsTitle?: string; cards?: GuideCard[] }> = {
+  places: {
+    facts: [
+      { label: 'Desert', value: 'At door', note: 'Katpana dune' },
+      { label: 'Airport', value: '15 min', note: 'Skardu International' },
+      { label: 'Lake', value: 'A day', note: 'Shangrila (Lower Kachura)' },
+      { label: 'Evening', value: 'By six', note: 'Ask for the bonfire' },
+    ],
+    cardsTitle: 'Out from the huts',
+    cards: [
+      { title: 'Walks without a car', body: 'The dune path starts right beyond the red roofs. In winter wear warm waterproof boots.' },
+      { title: 'Shangrila day run', body: 'Reception books the jeep in the morning and notes your return time for the evening fire.' },
+      { title: 'Three-night pickup', body: 'Airport car both ways is included from the third night; shorter stays can request it charged to folio.' },
+    ],
+  },
+  experiences: {
+    facts: [
+      { label: 'Breakfast', value: 'Included', note: 'Ask for a time' },
+      { label: 'Jeep', value: 'By request', note: 'Charged to the room' },
+      { label: 'Fire', value: 'By six', note: 'If the wind allows' },
+      { label: 'Lake', value: 'A day', note: 'Shangrila, not the resort' },
+    ],
+    stepsTitle: 'Tell reception. There is no second app.',
+    steps: [
+      { title: 'Name the afternoon', body: 'Jeep, sandboard, or the lake. Say how many of you are going.' },
+      { title: 'The desk writes it down', body: 'The charge, if there is one, posts to the folio the way room service does.' },
+      { title: 'Weather decides the rest', body: 'In snow the route is shorter. If the wind is up, the evening moves inside.' },
+    ],
+  },
+  offers: {
+    stepsTitle: 'How to use an offer',
+    steps: [
+      { title: 'Book on this site', body: 'Choose the room the offer names, if it names one. The executive offer is the executive room.' },
+      { title: 'Write it in the notes', body: 'The title of the offer is enough. The desk applies the public rate before you arrive.' },
+      { title: 'It does not stack', body: 'Offers do not combine with a corporate code. If two could apply, the desk will say which one stands.' },
+    ],
+    cardsTitle: 'The fine print in plain language',
+    cards: [
+      { title: 'Winter', body: 'The direct winter rate, breakfast included. Heating is already in the hut.' },
+      { title: 'Three nights', body: 'From the third night, the airport car is included both ways for guests on the booking.' },
+      { title: 'Late checkout', body: 'Until two, only if the hut is free the next day. Confirmed the evening before departure.' },
+      { title: 'Sunday dinner', body: 'The long-weekend offer adds the kitchen’s Sunday menu for the guests on the booking.' },
+    ],
+  },
+  restaurants: {
+    facts: [
+      { label: 'Breakfast', value: 'Included', note: 'Restaurant or tray' },
+      { label: 'Tray service', value: 'Until 11', note: 'PM · Order online or desk' },
+      { label: 'Dinner', value: 'Karahi & Daal', note: 'Cooked fresh daily' },
+      { label: 'Billing', value: 'One folio', note: 'Or Pay Now online' },
+    ],
+    cardsTitle: 'How the kitchen works',
+    cards: [
+      { title: 'Simple on purpose', body: 'Fresh breakfast trays and evening karahi, daal, rice, and trout rather than an overstretched city menu.' },
+      { title: 'Allergies & children', body: 'Tell reception at breakfast so the cook prepares plain portions alongside dinner.' },
+      { title: 'Outdoor table', body: 'Set between the huts when the wind stays calm; moves indoors automatically if weather shifts.' },
+    ],
+  },
+  journals: {
+    facts: [
+      { label: 'Grounds', value: '165 Kanals', note: 'Edge of Katpana dune' },
+      { label: 'Rooms', value: '19 Huts', note: 'Glass-fronted & heated' },
+      { label: 'Desk', value: 'Direct', note: 'Same book as the front desk' },
+      { label: 'Stories', value: 'Verified', note: 'Reviewed by team before posting' },
+    ],
+  },
+};
+
+export const tourStops = [
+  {
+    image: photos.row,
+    kicker: 'Arrival',
+    title: 'The row',
+    body: 'You arrive at the huts, not at a lobby in town. Check-in is from 2:00 PM. On a three-night stay the car stops here.',
+    points: ['Red roofs on the desert edge', 'The desk is the first door', 'Bags can wait while the room is opened'],
+  },
+  {
+    image: photos.deluxeDay,
+    kicker: 'The room',
+    title: 'Carved wood, and the valley',
+    body: 'The deluxe room faces the dune and the ridge. Breakfast is already in the rate. The heater is on in winter before you land.',
+    points: ['King bed, valley window', 'Wi-Fi and hot water', 'Ask if you want the quiet end'],
+  },
+  {
+    image: photos.nook,
+    kicker: 'Afternoon',
+    title: 'The window seat',
+    body: 'Tea, the desert, and nowhere you are required to be. Board games are at the desk if the weather turns.',
+    points: ['No schedule', 'The path is the walk', 'The court and the game room are on the grounds'],
+  },
+  {
+    image: photos.breakfast,
+    kicker: 'Morning',
+    title: 'The tray',
+    body: 'Eggs, toast, tea, and jam. Say the night before if you want it at a fixed time, or at the hut, or without eggs.',
+    points: ['Included', 'Restaurant or room', 'Lunch and dinner are separate'],
+  },
+  {
+    image: photos.bonfire,
+    kicker: 'Evening',
+    title: 'After six',
+    body: 'If you asked, the fire is on the sand and dinner can come out with it. If the wind is up, both move inside.',
+    points: ['Tell the desk by six', 'Chairs for the number you gave', 'No ticket'],
+  },
+  {
+    image: photos.wide,
+    kicker: 'Winter',
+    title: 'Snow on the same dune',
+    body: 'The ridge fills the window. Heating covers the room and the washroom. The airport road is a daylight drive.',
+    points: ['Direct winter rate on the offers page', 'Send the flight number', 'Boots, not a board'],
+  },
+];

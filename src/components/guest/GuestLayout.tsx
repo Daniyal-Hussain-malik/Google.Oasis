@@ -11,6 +11,8 @@ import {
 } from '@/src/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/src/components/ui/sheet';
 import { Separator } from '@/src/components/ui/separator';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
+import { Textarea } from '@/src/components/ui/textarea';
 import { useI18n } from '@/src/context/I18nContext';
 import { useAppTheme } from '@/src/context/ThemeContext';
 import { track } from '@/src/lib/api';
@@ -271,11 +273,16 @@ export function GuestLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="border-t border-white/10">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 text-xs opacity-70 sm:px-6 lg:px-8">
-            <p>© {new Date().getFullYear()} Oasis Resort Skardu. Katpana Cold Desert.</p>
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 text-xs opacity-75 sm:px-6 lg:px-8">
+            <div className="space-y-1">
+              <p>© {new Date().getFullYear()} Oasis Resort Skardu. Katpana Cold Desert.</p>
+              <p className="opacity-80">We accept cash, card, bank transfer, JazzCash and Easypaisa.</p>
+            </div>
             <div className="flex flex-wrap gap-4">
               <Link to="/legal/privacy" className="hover:underline">Privacy</Link>
               <Link to="/legal/terms" className="hover:underline">Terms</Link>
+              <Link to="/legal/access" className="hover:underline">Accessibility</Link>
+              <Link to="/legal/best-rate" className="hover:underline">Best Rate</Link>
               <Link to="/legal/cancellation" className="hover:underline">Cancellation</Link>
               <Link to="/legal/refund" className="hover:underline">Refund Policy</Link>
               <Link to="/legal/cookies" className="hover:underline">Cookies</Link>
@@ -320,6 +327,106 @@ export function GuestLayout({ children }: { children: React.ReactNode }) {
           </a>
         </Button>
       </div>
+
+      <ExitFeedbackDialog pathname={pathname} />
     </div>
+  );
+}
+
+const EXIT_REASONS: Array<[string, string]> = [
+  ['just_browsing', 'Just researching Skardu for later'],
+  ['dates_full', 'My dates or preferred room appeared unavailable'],
+  ['prices', 'Looking for a different rate / offer'],
+  ['location_travel', 'Checking flight or road plans first'],
+  ['missing_info', 'Couldn’t find the detail I needed'],
+  ['other', 'Something else'],
+];
+
+function ExitFeedbackDialog({ pathname }: { pathname: string }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState('just_browsing');
+  const [note, setNote] = useState('');
+  const [sent, setSent] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('oasis_exit_done') === '1') return;
+    } catch {
+      return;
+    }
+    if (pathname.startsWith('/book') || pathname.startsWith('/login') || pathname.startsWith('/order')) return;
+
+    let ready = false;
+    const timer = setTimeout(() => {
+      ready = true;
+    }, 20000);
+
+    const onLeave = (e: MouseEvent) => {
+      if (!ready || e.clientY > 4) return;
+      try {
+        if (sessionStorage.getItem('oasis_exit_done') === '1') return;
+        sessionStorage.setItem('oasis_exit_done', '1');
+      } catch {
+        /* ignore */
+      }
+      setOpen(true);
+    };
+
+    document.addEventListener('mouseleave', onLeave);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('mouseleave', onLeave);
+    };
+  }, [pathname]);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    track({ type: 'exit_reason', path: pathname, reason, note: note.trim() });
+    setSent(true);
+    setTimeout(() => setOpen(false), 900);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-display text-2xl">Before you head off…</DialogTitle>
+          <DialogDescription>
+            Quick two-second note for our Skardu front desk: what brought you out without booking today?
+          </DialogDescription>
+        </DialogHeader>
+        {sent ? (
+          <p className="py-4 text-sm text-emerald-600 font-medium">Thank you — noted for the team at Katpana.</p>
+        ) : (
+          <form onSubmit={submit} className="space-y-4">
+            <div className="grid gap-2">
+              {EXIT_REASONS.map(([code, label]) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setReason(code)}
+                  className={`rounded-lg border px-3 py-2 text-left text-sm cursor-pointer transition-colors ${
+                    reason === code ? 'border-accent bg-accent/10 font-medium text-foreground' : 'border-border text-muted-foreground hover:border-foreground/30'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <Textarea
+              rows={2}
+              maxLength={300}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Optional note (what were you looking for?)"
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Skip</Button>
+              <Button type="submit" variant="accent">Send Note</Button>
+            </div>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

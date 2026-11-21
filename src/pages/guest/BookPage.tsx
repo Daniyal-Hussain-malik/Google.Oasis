@@ -24,12 +24,13 @@ export function BookPage() {
 
   const [step, setStep] = useState(0);
   const [businessDate, setBusinessDate] = useState(todayISO());
+  const [maxRooms, setMaxRooms] = useState(4);
   const [stay, setStay] = useState({
     checkIn: initialIn,
     checkOut: initialOut,
     adults: clamp(params.get('adults') || 2, 1, 16),
     children: clamp(params.get('children') || 0, 0, 12),
-    rooms: clamp(params.get('rooms') || 1, 1, 4),
+    rooms: clamp(params.get('rooms') || 1, 1, 10),
   });
   const [offer] = useState(params.get('offer') || '');
   const [results, setResults] = useState<any[]>([]);
@@ -48,9 +49,14 @@ export function BookPage() {
 
   useEffect(() => {
     track({ type: 'book_open', path: '/book' });
-    api<{ businessDate: string }>('/public/hotel')
+    api<{ businessDate?: string; maxRoomsPerBooking?: number }>('/public/hotel')
       .then((res) => {
         if (res.businessDate) setBusinessDate(res.businessDate);
+        if (res.maxRoomsPerBooking) {
+          const cap = Math.max(1, Number(res.maxRoomsPerBooking));
+          setMaxRooms(cap);
+          setStay((p) => ({ ...p, rooms: clamp(p.rooms, 1, cap) }));
+        }
       })
       .catch(() => {});
   }, []);
@@ -112,7 +118,6 @@ export function BookPage() {
       } catch {
         /* ignore */
       }
-      track({ type: 'book_done', path: '/book', roomName: selected.roomType.name });
       toast.success(`Reservation ${booking.bookingNumber} confirmed`);
       navigate('/confirmed', { state: payload });
     } catch (err: any) {
@@ -199,13 +204,13 @@ export function BookPage() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label>Rooms</Label>
+                      <Label>Rooms (max {maxRooms})</Label>
                       <Input
                         type="number"
                         min={1}
-                        max={4}
+                        max={maxRooms}
                         value={stay.rooms}
-                        onChange={(e) => setStay((p) => ({ ...p, rooms: clamp(e.target.value, 1, 4) }))}
+                        onChange={(e) => setStay((p) => ({ ...p, rooms: clamp(e.target.value, 1, maxRooms) }))}
                       />
                     </div>
                   </CardContent>

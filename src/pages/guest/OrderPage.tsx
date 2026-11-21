@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
 import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select';
 import { Separator } from '@/src/components/ui/separator';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/src/components/ui/sheet';
 import { Tabs, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
@@ -28,8 +29,8 @@ const KITCHEN_STEPS = [
 
 const ORDER_TYPES: Array<[string, string]> = [
   ['room_service', 'To My Room'],
-  ['dine_in', 'Dine In'],
-  ['takeaway', 'Takeaway'],
+  ['dine_in', 'In the Restaurant'],
+  ['takeaway', 'Takeaway (Collect)'],
 ];
 
 interface CartLine {
@@ -63,11 +64,13 @@ export function OrderPage() {
   const [authError, setAuthError] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
 
-  const [menuData, setMenuData] = useState<any>({ items: [], categories: [], taxRate: 0, serviceRate: 0 });
+  const [menuData, setMenuData] = useState<any>({ items: [], categories: [], rates: { tax: 0, service: 0 } });
   const [activeCategory, setActiveCategory] = useState('All');
   const [activeItem, setActiveItem] = useState<any | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [orderType, setOrderType] = useState('room_service');
+  const [roomNo, setRoomNo] = useState('');
+  const [tableNo, setTableNo] = useState('');
   const [paymentMode, setPaymentMode] = useState<'room_charge' | 'pay_now'>('room_charge');
   const [notes, setNotes] = useState('');
   const [placing, setPlacing] = useState(false);
@@ -76,6 +79,14 @@ export function OrderPage() {
   const [payingOrder, setPayingOrder] = useState<any | null>(null);
 
   const token = session?.token || '';
+  const rooms: Array<{ roomNo: string; type?: string }> = session?.guest?.rooms || [];
+  const canOrder = Boolean(session?.canOrder);
+
+  useEffect(() => {
+    if (rooms.length === 1 && !roomNo) {
+      setRoomNo(rooms[0].roomNo);
+    }
+  }, [rooms, roomNo]);
 
   const loadMenu = useCallback(() => {
     api<any>('/public/restaurant/menu')
@@ -89,7 +100,7 @@ export function OrderPage() {
       const list = await api<any[]>('/public/restaurant/orders', { token });
       setOrders(list);
     } catch (err: any) {
-      if (/expired|invalid|token/i.test(err.message || '')) {
+      if (/expired|ended|open|book/i.test(err.message || '')) {
         sessionStorage.removeItem(SESSION_KEY);
         setSession(null);
       }
@@ -118,7 +129,9 @@ export function OrderPage() {
       });
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(res));
       setSession(res);
-      toast.success(`Signed in for Room ${res.roomNo}`);
+      const firstRoom = res?.guest?.rooms?.[0]?.roomNo || '';
+      if (res?.guest?.rooms?.length === 1) setRoomNo(firstRoom);
+      toast.success(`Signed in for ${res?.guest?.name || bookingNumber}`);
     } catch (err: any) {
       setAuthError(err.message || 'Could not open dining session');
     } finally {
@@ -130,6 +143,7 @@ export function OrderPage() {
     sessionStorage.removeItem(SESSION_KEY);
     setSession(null);
     setOrders([]);
+    setRoomNo('');
   }
 
   function addToCart(line: Omit<CartLine, 'key'>) {
@@ -158,21 +172,29 @@ export function OrderPage() {
     );
   }
 
+  const taxRate = Number(menuData?.rates?.tax || 0);
+  const serviceRate = Number(menuData?.rates?.service || 0);
   const subtotal = useMemo(() => cart.reduce((sum, l) => sum + lineUnit(l) * l.quantity, 0), [cart]);
-  const tax = Math.round((subtotal * (menuData.taxRate || 0)) / 100);
-  const service = Math.round((subtotal * (menuData.serviceRate || 0)) / 100);
+  const tax = Math.round((subtotal * taxRate) / 100);
+  const service = Math.round((subtotal * serviceRate) / 100);
   const grandTotal = subtotal + tax + service;
 
   async function placeOrder() {
     if (!cart.length) return;
+    if (rooms.length > 1 && !roomNo) {
+      toast.error('Please choose which room this order is for.');
+      return;
+    }
     setPlacing(true);
     try {
       const created = await api<any>('/public/restaurant/orders', {
         method: 'POST',
         token,
         body: {
-          orderType,
+          type: orderType,
           paymentMode,
+          roomNo: roomNo || rooms[0]?.roomNo || '',
+          table: orderType === 'dine_in' ? tableNo.trim() : undefined,
           notes: notes.trim(),
           items: cart.map((l) => ({
             menuItemId: l.menuItemId,
@@ -185,6 +207,7 @@ export function OrderPage() {
       });
       setCart([]);
       setNotes('');
+      setTableNo('');
       setCartOpen(false);
       await loadOrders();
       toast.success(`Order ${created.orderNumber} sent to kitchen`);
@@ -214,19 +237,29 @@ export function OrderPage() {
   const CartSummary = (
     <div className="space-y-4">
       {cart.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted-foreground">Your tray is empty. Select dishes from the menu.</p>
+        <p className="py-6 text-center text-sm text-muted-foreground">Tap Add on a dish to start.</p>
       ) : (
         <>
           <div className="space-y-3">
             {cart.map((line) => (
               <div key={line.key} className="flex items-start justify-between gap-3 border-b border-border pb-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">{line.name}</p>
-                  {line.variation && <p className="text-xs text-muted-foreground">{line.variation.name}</p>}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground">
+                    {line.name}
+                    {line.variation ? ` · ${line.variation.name}` : ''}
+                  </p>
                   {line.addOns.length > 0 && (
                     <p className="text-xs text-muted-foreground">+ {line.addOns.map((a) => a.name).join(', ')}</p>
                   )}
-                  {line.note && <p className="text-xs italic text-accent">{line.note}</p>}
+                  <Input
+                    className="mt-1.5 h-7 text-xs"
+                    placeholder="Special instructions"
+                    maxLength={200}
+                    value={line.note}
+                    onChange={(e) =>
+                      setCart((list) => list.map((x) => (x.key === line.key ? { ...x, note: e.target.value } : x)))
+                    }
+                  />
                   <p className="mt-1 font-mono text-xs font-medium tabular-nums">{pkr(lineUnit(line) * line.quantity)}</p>
                 </div>
                 <div className="flex items-center gap-1">
@@ -243,7 +276,7 @@ export function OrderPage() {
           </div>
 
           <div className="space-y-2">
-            <Label>Delivery Preference</Label>
+            <Label>Deliver</Label>
             <div className="grid grid-cols-3 gap-1.5">
               {ORDER_TYPES.map(([k, label]) => (
                 <Button
@@ -251,7 +284,7 @@ export function OrderPage() {
                   type="button"
                   size="sm"
                   variant={orderType === k ? 'default' : 'outline'}
-                  className="text-xs px-2"
+                  className="text-xs px-2 h-auto py-1.5"
                   onClick={() => setOrderType(k)}
                 >
                   {label}
@@ -260,8 +293,33 @@ export function OrderPage() {
             </div>
           </div>
 
+          {rooms.length > 1 && (
+            <div className="space-y-1.5">
+              <Label>Room</Label>
+              <Select value={roomNo} onValueChange={setRoomNo}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose room…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {rooms.map((r) => (
+                    <SelectItem key={r.roomNo} value={r.roomNo}>
+                      Room {r.roomNo} {r.type ? `· ${r.type}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {orderType === 'dine_in' && (
+            <div className="space-y-1.5">
+              <Label>Table (optional)</Label>
+              <Input value={tableNo} onChange={(e) => setTableNo(e.target.value)} placeholder="e.g. Garden 2" />
+            </div>
+          )}
+
           <div className="space-y-2">
-            <Label>Billing Mode</Label>
+            <Label>Payment</Label>
             <div className="grid grid-cols-2 gap-2">
               <Button
                 type="button"
@@ -277,14 +335,19 @@ export function OrderPage() {
                 variant={paymentMode === 'pay_now' ? 'accent' : 'outline'}
                 onClick={() => setPaymentMode('pay_now')}
               >
-                Pay by Transfer
+                Pay Now
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              {paymentMode === 'room_charge'
+                ? 'Added to your bill when served and paid at checkout.'
+                : 'Settle separately by Easypaisa or bank transfer in My Orders.'}
+            </p>
           </div>
 
           <div className="space-y-1.5">
-            <Label>Kitchen Instructions</Label>
-            <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Spice level, cutlery, tea timing..." />
+            <Label>Notes for the Kitchen</Label>
+            <Textarea rows={2} maxLength={500} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Spice level, cutlery, tea timing..." />
           </div>
 
           <div className="space-y-1 border-t border-border pt-3 text-xs">
@@ -294,13 +357,13 @@ export function OrderPage() {
             </div>
             {tax > 0 && (
               <div className="flex justify-between text-muted-foreground">
-                <span>Tax ({menuData.taxRate}%)</span>
+                <span>Tax ({taxRate}%)</span>
                 <span className="font-mono tabular-nums">{pkr(tax)}</span>
               </div>
             )}
             {service > 0 && (
               <div className="flex justify-between text-muted-foreground">
-                <span>Service ({menuData.serviceRate}%)</span>
+                <span>Service charge ({serviceRate}%)</span>
                 <span className="font-mono tabular-nums">{pkr(service)}</span>
               </div>
             )}
@@ -311,7 +374,7 @@ export function OrderPage() {
           </div>
 
           <Button type="button" variant="accent" className="w-full" disabled={placing} onClick={placeOrder}>
-            {placing ? 'Sending to Kitchen…' : 'Place Order'}
+            {placing ? 'Placing order…' : `Place Order · ${pkr(grandTotal)}`}
           </Button>
         </>
       )}
@@ -351,56 +414,66 @@ export function OrderPage() {
             </Card>
 
             <Alert severity="info">
-              Not checked in yet? Browse our <Link to="/dining" className="font-semibold underline">dining stories</Link> or check your <Link to="/booking" className="font-semibold underline">reservation status</Link>.
+              Not checked in yet? Browse our <Link to="/dining" className="font-semibold underline">dining notes</Link> or inspect your <Link to="/booking" className="font-semibold underline">booking status</Link>.
             </Alert>
           </div>
         ) : (
           <div className="space-y-8">
-            {/* Session Header */}
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-6">
               <div>
                 <p className="font-mono text-xs text-accent">
-                  Room {session.roomNo} · {session.bookingNumber}
+                  {rooms.length ? `Room ${rooms.map((r) => r.roomNo).join(', ')} · ` : ''}
+                  {session.guest?.bookingNumber}
                 </p>
                 <h1 className="font-display mt-1 text-4xl font-semibold">Oasis Kitchen</h1>
-                <p className="text-sm text-muted-foreground">Signed in as {session.guestName}</p>
+                <p className="text-sm text-muted-foreground">Signed in as {session.guest?.name}</p>
               </div>
               <div className="flex items-center gap-3">
-                <Sheet open={cartOpen} onOpenChange={setCartOpen}>
-                  <SheetTrigger asChild>
-                    <Button variant="outline" className="lg:hidden">
-                      <ShoppingBag className="h-4 w-4" />
-                      Tray ({cart.reduce((s, i) => s + i.quantity, 0)})
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="right" className="overflow-y-auto">
-                    <SheetHeader>
-                      <SheetTitle className="font-display text-2xl">Your Dining Tray</SheetTitle>
-                    </SheetHeader>
-                    <div className="mt-6">{CartSummary}</div>
-                  </SheetContent>
-                </Sheet>
+                {canOrder && (
+                  <Sheet open={cartOpen} onOpenChange={setCartOpen}>
+                    <SheetTrigger asChild>
+                      <Button variant="outline" className="lg:hidden">
+                        <ShoppingBag className="h-4 w-4" />
+                        Tray ({cart.reduce((s, i) => s + i.quantity, 0)})
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="right" className="overflow-y-auto">
+                      <SheetHeader>
+                        <SheetTitle className="font-display text-2xl">Your Dining Tray</SheetTitle>
+                      </SheetHeader>
+                      <div className="mt-6">{CartSummary}</div>
+                    </SheetContent>
+                  </Sheet>
+                )}
                 <Button variant="ghost" size="sm" onClick={signOut}>
                   Exit Dining
                 </Button>
               </div>
             </div>
 
-            {/* Active Orders Tracking */}
+            {!canOrder && (
+              <Alert severity="info">
+                Food ordering opens once reception marks your stay as checked in.
+              </Alert>
+            )}
+
             {orders.length > 0 && (
               <div className="space-y-4">
-                <h2 className="font-display text-2xl font-semibold">Live Kitchen Orders</h2>
+                <h2 className="font-display text-2xl font-semibold">My Orders</h2>
                 <div className="grid gap-4 md:grid-cols-2">
                   {orders.map((ord) => {
                     const stepIdx = Math.max(0, KITCHEN_STEPS.findIndex(([k]) => k === ord.status));
+                    const orderId = ord.id || ord._id;
                     return (
-                      <Card key={ord._id}>
+                      <Card key={orderId}>
                         <CardHeader className="pb-2">
                           <div className="flex items-center justify-between">
                             <div>
-                              <CardTitle className="font-mono text-base">{ord.orderNumber}</CardTitle>
+                              <CardTitle className="font-mono text-base">
+                                {ord.orderNumber} {ord.roomNo ? `· Room ${ord.roomNo}` : ''}
+                              </CardTitle>
                               <CardDescription>
-                                {ord.items.map((i: any) => `${i.quantity}× ${i.name}`).join(', ')}
+                                {(ord.items || []).map((i: any) => `${i.quantity}× ${i.name}${i.variation ? ` (${i.variation})` : ''}`).join(', ')}
                               </CardDescription>
                             </div>
                             <span className="font-mono text-sm font-semibold tabular-nums">{pkr(ord.total)}</span>
@@ -408,7 +481,9 @@ export function OrderPage() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                           {ord.status === 'cancelled' ? (
-                            <Alert severity="warning">Order cancelled</Alert>
+                            <Alert severity="warning">
+                              Order cancelled{ord.cancelReason ? `: ${ord.cancelReason}` : ''}
+                            </Alert>
                           ) : (
                             <Stepper activeStep={stepIdx} alternativeLabel>
                               {KITCHEN_STEPS.map(([k, label]) => (
@@ -419,10 +494,12 @@ export function OrderPage() {
                             </Stepper>
                           )}
                           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                            <span>Payment: {ord.paymentStatus?.replaceAll('_', ' ')}</span>
+                            <span>
+                              {ord.paymentMode === 'room_charge' ? 'Room charge' : `Pay now · ${ord.paymentStatus?.replaceAll('_', ' ')}`}
+                            </span>
                             <div className="flex gap-2">
                               {ord.status === 'new' && (
-                                <Button type="button" variant="destructive" size="sm" onClick={() => cancelOrder(ord._id)}>
+                                <Button type="button" variant="destructive" size="sm" onClick={() => cancelOrder(orderId)}>
                                   Cancel Order
                                 </Button>
                               )}
@@ -441,8 +518,7 @@ export function OrderPage() {
               </div>
             )}
 
-            {/* Menu & Sticky Tray Grid */}
-            <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
+            <div className={`grid gap-8 ${canOrder ? 'lg:grid-cols-[1fr_360px]' : ''}`}>
               <div className="space-y-6">
                 <Tabs value={activeCategory} onValueChange={setActiveCategory}>
                   <TabsList className="flex-wrap h-auto">
@@ -455,59 +531,66 @@ export function OrderPage() {
                 </Tabs>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {visibleItems.map((item: any) => (
-                    <Card key={item._id} className="overflow-hidden flex flex-col justify-between">
-                      <div>
-                        {item.image && (
-                          <div className="h-44">
-                            <ResilientImage src={media(item.image)} alt={item.name} className="h-full w-full object-cover" />
-                          </div>
-                        )}
-                        <CardContent className="p-5">
-                          <div className="flex items-start justify-between gap-2">
-                            <h3 className="text-base font-semibold text-foreground">{item.name}</h3>
-                            <span className="font-mono text-sm font-semibold tabular-nums text-accent">
-                              {pkr(item.price)}
-                            </span>
-                          </div>
-                          <p className="mt-1 text-xs text-muted-foreground">{item.category}</p>
-                          {item.description && (
-                            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{item.description}</p>
+                  {visibleItems.map((item: any) => {
+                    const hasVars = item.variations?.length > 0;
+                    const priceLabel = hasVars
+                      ? `from ${pkr(Math.min(...item.variations.map((v: any) => v.price)))}`
+                      : pkr(item.price);
+                    return (
+                      <Card key={item._id} className="overflow-hidden flex flex-col justify-between">
+                        <div>
+                          {item.image && (
+                            <div className="h-44">
+                              <ResilientImage src={media(item.image)} alt={item.name} className="h-full w-full object-cover" />
+                            </div>
                           )}
-                        </CardContent>
-                      </div>
-                      <div className="px-5 pb-5">
-                        <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => setActiveItem(item)}>
-                          <UtensilsCrossed className="h-3.5 w-3.5" />
-                          Add to Tray
-                        </Button>
-                      </div>
-                    </Card>
-                  ))}
+                          <CardContent className="p-5">
+                            <div className="flex items-start justify-between gap-2">
+                              <h3 className="text-base font-semibold text-foreground">{item.name}</h3>
+                              <span className="font-mono text-sm font-semibold tabular-nums text-accent">{priceLabel}</span>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">{item.category}</p>
+                            {item.description && (
+                              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{item.description}</p>
+                            )}
+                          </CardContent>
+                        </div>
+                        <div className="px-5 pb-5">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            disabled={!canOrder}
+                            onClick={() => setActiveItem(item)}
+                          >
+                            <UtensilsCrossed className="h-3.5 w-3.5" />
+                            Add to Tray
+                          </Button>
+                        </div>
+                      </Card>
+                    );
+                  })}
                 </div>
               </div>
 
-              <aside className="hidden lg:block h-fit sticky top-24">
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="font-display text-2xl">Your Dining Tray</CardTitle>
-                  </CardHeader>
-                  <CardContent>{CartSummary}</CardContent>
-                </Card>
-              </aside>
+              {canOrder && (
+                <aside className="hidden lg:block h-fit sticky top-24">
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="font-display text-2xl">Your Dining Tray</CardTitle>
+                    </CardHeader>
+                    <CardContent>{CartSummary}</CardContent>
+                  </Card>
+                </aside>
+              )}
             </div>
           </div>
         )}
       </div>
 
-      {/* Item Customization Dialog */}
-      <ItemCustomizeDialog
-        item={activeItem}
-        onClose={() => setActiveItem(null)}
-        onAdd={addToCart}
-      />
+      <ItemCustomizeDialog item={activeItem} onClose={() => setActiveItem(null)} onAdd={addToCart} />
 
-      {/* Order Payment Proof Dialog */}
       <Dialog open={Boolean(payingOrder)} onOpenChange={(o) => !o && setPayingOrder(null)}>
         <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           {payingOrder && (
@@ -521,7 +604,7 @@ export function OrderPage() {
               <PaymentProofForm
                 defaultAmount={payingOrder.total - payingOrder.paidAmount}
                 submit={(f) =>
-                  api(`/public/restaurant/orders/${payingOrder._id}/payment-claim`, {
+                  api(`/public/restaurant/orders/${payingOrder.id || payingOrder._id}/payment-claim`, {
                     method: 'POST',
                     token,
                     body: f,
@@ -556,7 +639,8 @@ function ItemCustomizeDialog({
 
   useEffect(() => {
     if (!item) return;
-    setVariationId(item.variations?.[0]?._id ? String(item.variations[0]._id) : '');
+    const firstVar = item.variations?.[0];
+    setVariationId(firstVar ? String(firstVar.id ?? firstVar._id) : '');
     setAddOnIds([]);
     setQuantity(1);
     setNote('');
@@ -564,8 +648,8 @@ function ItemCustomizeDialog({
 
   if (!item) return null;
 
-  const chosenVar = (item.variations || []).find((v: any) => String(v._id) === variationId) || null;
-  const chosenAddOns = (item.addOns || []).filter((a: any) => addOnIds.includes(String(a._id)));
+  const chosenVar = (item.variations || []).find((v: any) => String(v.id ?? v._id) === variationId) || null;
+  const chosenAddOns = (item.addOns || []).filter((a: any) => addOnIds.includes(String(a.id ?? a._id)));
   const unitPrice = (chosenVar ? chosenVar.price : item.price) + chosenAddOns.reduce((s: number, a: any) => s + a.price, 0);
 
   function submit(e: React.FormEvent) {
@@ -574,8 +658,8 @@ function ItemCustomizeDialog({
       menuItemId: item._id,
       name: item.name,
       price: item.price,
-      variation: chosenVar ? { id: chosenVar._id, name: chosenVar.name, price: chosenVar.price } : null,
-      addOns: chosenAddOns.map((a: any) => ({ id: a._id, name: a.name, price: a.price })),
+      variation: chosenVar ? { id: chosenVar.id ?? chosenVar._id, name: chosenVar.name, price: chosenVar.price } : null,
+      addOns: chosenAddOns.map((a: any) => ({ id: a.id ?? a._id, name: a.name, price: a.price })),
       quantity,
       note: note.trim(),
     });
@@ -594,25 +678,28 @@ function ItemCustomizeDialog({
             <div className="space-y-2">
               <Label>Portion / Style</Label>
               <div className="space-y-1.5">
-                {item.variations.map((v: any) => (
-                  <label
-                    key={v._id}
-                    className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2.5 text-sm ${
-                      variationId === String(v._id) ? 'border-accent bg-accent/10' : 'border-border'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="variation"
-                        checked={variationId === String(v._id)}
-                        onChange={() => setVariationId(String(v._id))}
-                      />
-                      {v.name}
-                    </span>
-                    <span className="font-mono font-medium tabular-nums">{pkr(v.price)}</span>
-                  </label>
-                ))}
+                {item.variations.map((v: any) => {
+                  const vid = String(v.id ?? v._id);
+                  return (
+                    <label
+                      key={vid}
+                      className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2.5 text-sm ${
+                        variationId === vid ? 'border-accent bg-accent/10' : 'border-border'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="variation"
+                          checked={variationId === vid}
+                          onChange={() => setVariationId(vid)}
+                        />
+                        {v.name}
+                      </span>
+                      <span className="font-mono font-medium tabular-nums">{pkr(v.price)}</span>
+                    </label>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -622,11 +709,11 @@ function ItemCustomizeDialog({
               <Label>Add-ons</Label>
               <div className="space-y-1.5">
                 {item.addOns.map((a: any) => {
-                  const sid = String(a._id);
+                  const sid = String(a.id ?? a._id);
                   const checked = addOnIds.includes(sid);
                   return (
                     <label
-                      key={a._id}
+                      key={sid}
                       className="flex cursor-pointer items-center justify-between rounded-lg border border-border px-3 py-2.5 text-sm"
                     >
                       <span className="flex items-center gap-2">

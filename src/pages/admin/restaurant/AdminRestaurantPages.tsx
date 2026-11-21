@@ -6,7 +6,6 @@ import {
   Check,
   ChefHat,
   Clock,
-  CreditCard,
   Minus,
   Plus,
   Printer,
@@ -898,6 +897,21 @@ export function RestaurantOrdersPage() {
   const [refundMethod, setRefundMethod] = useState('cash');
   const [refundReason, setRefundReason] = useState('');
 
+  const [cancelTarget, setCancelTarget] = useState<any | null>(null);
+  const [cancelReason, setCancelReason] = useState('Cancelled by staff');
+  const [orderReceipt, setOrderReceipt] = useState<any | null>(null);
+
+  // Add supplementary items modal for open orders
+  const [addOpen, setAddOpen] = useState(false);
+  const [boardItems, setBoardItems] = useState<any[]>([]);
+  const [addCart, setAddCart] = useState<PosCartLine[]>([]);
+  const [addSearch, setAddSearch] = useState('');
+  const [pickSuppItem, setPickSuppItem] = useState<any | null>(null);
+  const [pickSuppVarId, setPickSuppVarId] = useState('');
+  const [pickSuppAddOnIds, setPickSuppAddOnIds] = useState<string[]>([]);
+  const [pickSuppNote, setPickSuppNote] = useState('');
+  const [busy, setBusy] = useState(false);
+
   const load = useCallback(async () => {
     try {
       const qs = new URLSearchParams({ limit: '50' });
@@ -928,6 +942,7 @@ export function RestaurantOrdersPage() {
   async function submitPayment(e: React.FormEvent) {
     e.preventDefault();
     if (!selected) return;
+    setBusy(true);
     try {
       const res = await adminApi<any>(`/admin/restaurant/orders/${selected.order._id}/payments`, {
         method: 'POST',
@@ -939,27 +954,37 @@ export function RestaurantOrdersPage() {
       load();
     } catch (err: any) {
       toast.error(err.message);
+    } finally {
+      setBusy(false);
     }
   }
 
-  async function cancelLine(lineId: string | number) {
-    if (!selected) return;
+  async function confirmCancelLine(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selected || !cancelTarget) return;
+    setBusy(true);
     try {
+      const lineId = cancelTarget._id || cancelTarget.id;
       const res = await adminApi<any>(`/admin/restaurant/orders/${selected.order._id}/cancel`, {
         method: 'POST',
-        body: { lineIds: [lineId], reason: 'Cancelled by staff' },
+        body: { lineIds: [lineId], reason: cancelReason.trim() || 'Cancelled by staff' },
       });
       setSelected(res);
+      setCancelTarget(null);
+      setCancelReason('Cancelled by staff');
       toast.success('Item cancelled and cancellation KOT sent');
       load();
     } catch (err: any) {
       toast.error(err.message);
+    } finally {
+      setBusy(false);
     }
   }
 
   async function issueRefund(e: React.FormEvent) {
     e.preventDefault();
     if (!selected) return;
+    setBusy(true);
     try {
       const res = await adminApi<any>(`/admin/restaurant/orders/${selected.order._id}/refunds`, {
         method: 'POST',
@@ -972,8 +997,128 @@ export function RestaurantOrdersPage() {
       load();
     } catch (err: any) {
       toast.error(err.message);
+    } finally {
+      setBusy(false);
     }
   }
+
+  async function stepKot(kotId: string | number, to: string) {
+    setBusy(true);
+    try {
+      await adminApi(`/admin/restaurant/kots/${kotId}/status`, { method: 'POST', body: { to } });
+      if (selected?.order?._id) await openDetail(selected.order._id);
+      toast.success(`Ticket marked ${to}`);
+      load();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openPaymentReceipt(paymentId: string | number) {
+    try {
+      const res = await adminApi<any>(`/admin/restaurant/payments/${paymentId}/receipt`);
+      setOrderReceipt(res);
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  }
+
+  async function openAddItemsModal() {
+    setAddOpen(true);
+    setAddCart([]);
+    setAddSearch('');
+    try {
+      const res = await adminApi<any>('/admin/restaurant/board');
+      setBoardItems((res.items || []).filter((i: any) => i.available !== false));
+    } catch (err: any) {
+      toast.error(err.message || 'Could not load dishes');
+    }
+  }
+
+  function pushSuppLine(item: any, variation: any | undefined, addOns: any[], note: string) {
+    const base = variation ? Number(variation.price) : Number(item.price || 0);
+    const addTotal = addOns.reduce((s, a) => s + Number(a.price || 0), 0);
+    const unitPrice = base + addTotal;
+    const varId = variation ? String(variation._id || variation.id) : undefined;
+    const addIds = addOns.map((a) => String(a._id || a.id)).sort();
+    const key = `${item._id || item.id}|${varId || ''}|${addIds.join(',')}|${note.trim()}`;
+
+    setAddCart((prev) => {
+      const existing = prev.find((l) => l.key === key);
+      if (existing) {
+        return prev.map((l) => (l.key === key ? { ...l, quantity: l.quantity + 1 } : l));
+      }
+      return [
+        ...prev,
+        {
+          key,
+          menuItemId: String(item._id || item.id),
+          name: item.name,
+          variationId: varId,
+          variationName: variation?.name,
+          addOnIds: addIds,
+          addOnNames: addOns.map((a) => a.name),
+          unitPrice,
+          quantity: 1,
+          note: note.trim(),
+        },
+      ];
+    });
+  }
+
+  function tapSuppItem(item: any) {
+    const vars = item.variations || [];
+    const adds = item.addOns || [];
+    if (vars.length || adds.length) {
+      setPickSuppItem(item);
+      setPickSuppVarId(vars[0]?._id || vars[0]?.id ? String(vars[0]._id || vars[0].id) : '');
+      setPickSuppAddOnIds([]);
+      setPickSuppNote('');
+      return;
+    }
+    pushSuppLine(item, undefined, [], '');
+  }
+
+  async function submitAddItems() {
+    if (!selected || addCart.length === 0) return;
+    setBusy(true);
+    try {
+      const res = await adminApi<any>(`/admin/restaurant/orders/${selected.order._id}/items`, {
+        method: 'POST',
+        body: {
+          items: addCart.map((l) => ({
+            menuItemId: l.menuItemId,
+            ...(l.variationId ? { variationId: l.variationId } : {}),
+            ...(l.addOnIds.length ? { addOnIds: l.addOnIds } : {}),
+            quantity: l.quantity,
+            note: l.note,
+          })),
+        },
+      });
+      setSelected(res);
+      setAddOpen(false);
+      setAddCart([]);
+      toast.success('Supplementary items added & fired to kitchen');
+      load();
+    } catch (err: any) {
+      toast.error(err.message || 'Could not add items');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const nextKotStep = (k: any): { to: string; label: string } | null => {
+    if (k.type === 'cancellation') return k.status === 'new' ? { to: 'acknowledged', label: 'Acknowledge' } : null;
+    if (k.status === 'new') return { to: 'accepted', label: 'Accept' };
+    if (k.status === 'accepted') return { to: 'preparing', label: 'Cook' };
+    if (k.status === 'preparing') return { to: 'ready', label: 'Ready' };
+    if (k.status === 'ready') return { to: 'served', label: 'Served' };
+    return null;
+  };
+
+  const canAddMoreItems = selected && ['new', 'accepted', 'preparing', 'ready'].includes(selected.order.status);
 
   return (
     <AdminLayout title="Restaurant Orders">
@@ -1054,20 +1199,26 @@ export function RestaurantOrdersPage() {
       </div>
 
       {/* MUI Order Folio & Action Drawer */}
-      <Drawer anchor="right" open={Boolean(selected)} onClose={() => setSelected(null)}>
+      <Drawer
+        anchor="right"
+        open={Boolean(selected)}
+        onClose={() => setSelected(null)}
+        slotProps={{ paper: { sx: { width: { xs: '100%', sm: 540 } } } }}
+      >
         {selected && (
-          <div className="w-[92vw] max-w-lg p-6 space-y-6">
+          <div className="flex h-full flex-col overflow-y-auto p-6 space-y-6 bg-card text-card-foreground">
             <div className="flex items-start justify-between border-b border-border pb-4">
               <div>
                 <p className="font-mono text-xs uppercase text-muted-foreground">
                   {selected.order.orderNumber} · {orderTypeLabel(selected.order.type)}
+                  {selected.order.roomNo ? ` · Room ${selected.order.roomNo}` : selected.order.table ? ` · Table ${selected.order.table}` : ''}
                 </p>
                 <h2 className="font-display text-2xl font-semibold">
                   {selected.order.guestName || (selected.order.table ? `Table ${selected.order.table}` : 'Dining Order')}
                 </h2>
                 <p className="text-xs text-muted-foreground">
                   Status: <span className="capitalize font-medium text-foreground">{selected.order.status}</span> · Billing:{' '}
-                  <span className="capitalize">{String(selected.order.paymentStatus || '').replaceAll('_', ' ')}</span>
+                  <span className="capitalize">{String(selected.order.paymentStatus || selected.order.paymentMode).replaceAll('_', ' ')}</span>
                 </p>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setSelected(null)}>
@@ -1076,7 +1227,15 @@ export function RestaurantOrdersPage() {
             </div>
 
             <div className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Order Lines</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Order Lines</h3>
+                {canAddMoreItems && (
+                  <Button type="button" size="sm" variant="outline" onClick={openAddItemsModal}>
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Items
+                  </Button>
+                )}
+              </div>
               <div className="divide-y divide-border rounded-lg border border-border">
                 {(selected.order.items || []).map((line: any) => (
                   <div key={line._id || line.id} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
@@ -1085,16 +1244,22 @@ export function RestaurantOrdersPage() {
                         {line.quantity} × {line.name} {line.variation ? `(${line.variation})` : ''}
                       </p>
                       {line.note && <p className="text-xs italic text-muted-foreground">{line.note}</p>}
+                      {line.status === 'cancelled' && line.cancelReason && (
+                        <p className="text-xs text-destructive">Cancelled: {line.cancelReason}</p>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="font-mono tabular-nums">{pkr(line.lineTotal)}</span>
-                      {line.status === 'active' && (
+                      {line.status === 'active' && selected.order.status !== 'served' && (
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-destructive"
-                          onClick={() => cancelLine(line._id || line.id)}
+                          onClick={() => {
+                            setCancelTarget(line);
+                            setCancelReason('Cancelled by staff');
+                          }}
                           title="Cancel item"
                         >
                           <Ban className="h-3.5 w-3.5" />
@@ -1112,7 +1277,7 @@ export function RestaurantOrdersPage() {
                 <span className="font-mono">{pkr(selected.order.subtotal)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
-                <span>Tax & Service</span>
+                <span>Tax &amp; Service</span>
                 <span className="font-mono">
                   {pkr(Number(selected.order.taxAmount || 0) + Number(selected.order.serviceAmount || 0))}
                 </span>
@@ -1124,6 +1289,42 @@ export function RestaurantOrdersPage() {
                 </span>
               </div>
             </div>
+
+            {/* Kitchen Tickets */}
+            {(selected.kots || []).length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Kitchen Tickets (KOT)</h3>
+                <div className="divide-y divide-border rounded-lg border border-border text-xs">
+                  {selected.kots.map((k: any) => {
+                    const step = nextKotStep(k);
+                    return (
+                      <div key={k._id || k.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                        <div>
+                          <p className="font-mono font-semibold">
+                            {k.kotNumber}{' '}
+                            <span className="font-sans font-normal capitalize text-muted-foreground">· {k.type} · {k.status}</span>
+                          </p>
+                          <p className="text-muted-foreground">
+                            {(k.items || []).map((i: any) => `${i.quantity}× ${i.name}`).join(', ')}
+                          </p>
+                        </div>
+                        {step && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() => stepKot(k._id || k.id, step.to)}
+                          >
+                            {step.label}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {selected.order.paymentMode === 'pay_now' && selected.order.status !== 'cancelled' && (
               <form onSubmit={submitPayment} className="space-y-3 rounded-lg border border-border p-4">
@@ -1152,7 +1353,7 @@ export function RestaurantOrdersPage() {
                 </div>
                 <div className="flex gap-2">
                   <Input value={payRef} onChange={(e) => setPayRef(e.target.value)} placeholder="Reference / Slip #" />
-                  <Button type="submit" variant="accent">
+                  <Button type="submit" variant="accent" disabled={busy}>
                     Post
                   </Button>
                 </div>
@@ -1183,15 +1384,284 @@ export function RestaurantOrdersPage() {
                 </div>
                 <div className="flex gap-2">
                   <Input value={refundReason} onChange={(e) => setRefundReason(e.target.value)} placeholder="Reason" />
-                  <Button type="submit" variant="destructive">
+                  <Button type="submit" variant="destructive" disabled={busy}>
                     Refund
                   </Button>
                 </div>
               </form>
             )}
+
+            {/* Payments History */}
+            {(selected.payments || []).length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Payments &amp; Receipts</h3>
+                <div className="divide-y divide-border rounded-lg border border-border text-xs">
+                  {selected.payments.map((p: any) => (
+                    <div key={p._id || p.id} className="flex items-center justify-between gap-2 px-3 py-2.5">
+                      <div>
+                        <p className="font-mono font-medium">
+                          {p.receiptNumber} · <span className="capitalize font-sans">{String(p.method || '').replaceAll('_', ' ')}</span>
+                        </p>
+                        {p.reference && <p className="text-muted-foreground">Ref: {p.reference}</p>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`font-mono font-semibold ${p.kind === 'refund' ? 'text-destructive' : 'text-emerald-600'}`}>
+                          {p.kind === 'refund' ? `-${pkr(p.amount)}` : pkr(p.amount)}
+                        </span>
+                        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => openPaymentReceipt(p._id || p.id)}>
+                          <Receipt className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Order History */}
+            {(selected.order.history || []).length > 0 && (
+              <div className="space-y-2 pb-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Order Activity</h3>
+                <div className="space-y-1.5 rounded-lg border border-border p-3 text-xs text-muted-foreground">
+                  {selected.order.history.map((h: any, idx: number) => (
+                    <div key={idx} className="flex justify-between gap-2">
+                      <span>
+                        <span className="font-medium capitalize text-foreground">{String(h.event || '').replaceAll('_', ' ')}</span>
+                        {h.note ? ` · ${h.note}` : ''}
+                        {h.by?.name ? ` (${h.by.name})` : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Drawer>
+
+      {/* Cancel Item Dialog */}
+      <Dialog open={Boolean(cancelTarget)} onOpenChange={(o) => !o && setCancelTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancel {cancelTarget?.name}?</DialogTitle>
+            <DialogDescription>
+              A cancellation KOT will be fired to the kitchen immediately.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={confirmCancelLine} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Cancellation Reason (min 3 characters)</Label>
+              <Input
+                required
+                minLength={3}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Guest changed mind, out of stock…"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setCancelTarget(null)}>Keep Item</Button>
+              <Button type="submit" variant="destructive" disabled={busy}>Confirm Cancel</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Supplementary Items Dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add Items to {selected?.order?.orderNumber}</DialogTitle>
+            <DialogDescription>Fires a supplementary KOT to the kitchen without creating a second order.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input value={addSearch} onChange={(e) => setAddSearch(e.target.value)} placeholder="Search dishes to add…" />
+            <div className="grid max-h-64 gap-2 overflow-y-auto sm:grid-cols-2">
+              {boardItems
+                .filter((i) => !addSearch.trim() || `${i.name} ${i.category}`.toLowerCase().includes(addSearch.trim().toLowerCase()))
+                .map((item) => {
+                  const vars = item.variations || [];
+                  const minP = vars.length ? Math.min(...vars.map((v: any) => Number(v.price || 0))) : Number(item.price || 0);
+                  return (
+                    <button
+                      key={item._id || item.id}
+                      type="button"
+                      onClick={() => tapSuppItem(item)}
+                      className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-left text-sm hover:border-accent cursor-pointer"
+                    >
+                      <span className="truncate font-medium">{item.name}</span>
+                      <span className="ml-2 shrink-0 font-mono text-xs text-accent">+{pkr(minP)}</span>
+                    </button>
+                  );
+                })}
+            </div>
+
+            {addCart.length > 0 && (
+              <div className="space-y-2 rounded-lg border border-border p-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Items to Add ({addCart.length})</p>
+                {addCart.map((line) => (
+                  <div key={line.key} className="flex items-center justify-between gap-2 text-sm">
+                    <div>
+                      <span className="font-medium">{line.name}</span>
+                      {line.variationName && <span className="text-xs text-muted-foreground"> ({line.variationName})</span>}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() =>
+                          setAddCart((prev) =>
+                            prev.map((l) => (l.key === line.key ? { ...l, quantity: l.quantity - 1 } : l)).filter((l) => l.quantity > 0),
+                          )
+                        }
+                      >
+                        <Minus className="h-3 w-3" />
+                      </Button>
+                      <span className="w-5 text-center font-mono text-xs">{line.quantity}</span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() =>
+                          setAddCart((prev) => prev.map((l) => (l.key === line.key ? { ...l, quantity: l.quantity + 1 } : l)))
+                        }
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+              <Button type="button" variant="accent" disabled={busy || addCart.length === 0} onClick={submitAddItems}>
+                {busy ? 'Sending…' : 'Fire Supplementary KOT'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dish Option Picker for Add Items */}
+      <Dialog open={Boolean(pickSuppItem)} onOpenChange={(o) => !o && setPickSuppItem(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{pickSuppItem?.name}</DialogTitle>
+          </DialogHeader>
+          {pickSuppItem && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const variation = (pickSuppItem.variations || []).find((v: any) => String(v._id || v.id) === pickSuppVarId);
+                const addOns = (pickSuppItem.addOns || []).filter((a: any) => pickSuppAddOnIds.includes(String(a._id || a.id)));
+                pushSuppLine(pickSuppItem, variation, addOns, pickSuppNote);
+                setPickSuppItem(null);
+              }}
+              className="space-y-4"
+            >
+              {(pickSuppItem.variations || []).length > 0 && (
+                <div className="space-y-2">
+                  <Label>Variation</Label>
+                  <div className="grid gap-2">
+                    {pickSuppItem.variations.map((v: any) => {
+                      const vid = String(v._id || v.id);
+                      const checked = pickSuppVarId === vid;
+                      return (
+                        <button
+                          key={vid}
+                          type="button"
+                          onClick={() => setPickSuppVarId(vid)}
+                          className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm cursor-pointer ${
+                            checked ? 'border-accent bg-accent/10 font-medium' : 'border-border'
+                          }`}
+                        >
+                          <span>{v.name}</span>
+                          <span className="font-mono tabular-nums">{pkr(v.price)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {(pickSuppItem.addOns || []).length > 0 && (
+                <div className="space-y-2">
+                  <Label>Add-ons</Label>
+                  <div className="grid gap-2">
+                    {pickSuppItem.addOns.map((a: any) => {
+                      const aid = String(a._id || a.id);
+                      const active = pickSuppAddOnIds.includes(aid);
+                      return (
+                        <button
+                          key={aid}
+                          type="button"
+                          onClick={() =>
+                            setPickSuppAddOnIds((prev) => (active ? prev.filter((x) => x !== aid) : [...prev, aid]))
+                          }
+                          className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm cursor-pointer ${
+                            active ? 'border-accent bg-accent/10 font-medium' : 'border-border'
+                          }`}
+                        >
+                          <span>{a.name}</span>
+                          <span className="font-mono tabular-nums">+{pkr(a.price)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <Input value={pickSuppNote} onChange={(e) => setPickSuppNote(e.target.value)} placeholder="Special instruction…" />
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setPickSuppItem(null)}>Cancel</Button>
+                <Button type="submit" variant="accent">Add</Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Order Payment Receipt Modal */}
+      <Dialog open={Boolean(orderReceipt)} onOpenChange={(o) => !o && setOrderReceipt(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{orderReceipt?.hotel?.name || 'Oasis Resort'} — Receipt</DialogTitle>
+            <DialogDescription>{orderReceipt?.payment?.receiptNumber}</DialogDescription>
+          </DialogHeader>
+          {orderReceipt && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded-lg border border-border p-4 space-y-1.5">
+                <p className="flex justify-between">
+                  <span className="text-muted-foreground">Order</span>
+                  <span className="font-mono">{orderReceipt.order?.orderNumber}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-muted-foreground">Guest</span>
+                  <span>{orderReceipt.payment?.guestName || 'Walk-in Guest'}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-muted-foreground">Method</span>
+                  <span className="capitalize">{String(orderReceipt.payment?.method || '').replaceAll('_', ' ')}</span>
+                </p>
+                <Separator className="my-2" />
+                <p className="flex justify-between font-semibold text-base">
+                  <span>{orderReceipt.payment?.kind === 'refund' ? 'Refunded' : 'Paid'}</span>
+                  <span className="font-mono">{pkr(orderReceipt.payment?.amount)}</span>
+                </p>
+              </div>
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={() => window.print()}>
+                  <Printer className="h-4 w-4" />
+                  Print
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }
@@ -1579,9 +2049,12 @@ export function RestaurantMenuPage() {
   const [station, setStation] = useState('Kitchen');
   const [price, setPrice] = useState('');
   const [prepMinutes, setPrepMinutes] = useState('15');
+  const [sortOrder, setSortOrder] = useState('0');
   const [description, setDescription] = useState('');
   const [image, setImage] = useState('');
   const [available, setAvailable] = useState(true);
+  const [variations, setVariations] = useState<Array<{ _id?: string; name: string; price: string }>>([]);
+  const [addOns, setAddOns] = useState<Array<{ _id?: string; name: string; price: string }>>([]);
   const [uploading, setUploading] = useState(false);
 
   const load = useCallback(async () => {
@@ -1608,9 +2081,12 @@ export function RestaurantMenuPage() {
     setStation('Kitchen');
     setPrice('');
     setPrepMinutes('15');
+    setSortOrder('0');
     setDescription('');
     setImage('');
     setAvailable(true);
+    setVariations([]);
+    setAddOns([]);
   }
 
   function openEdit(item: any) {
@@ -1620,9 +2096,24 @@ export function RestaurantMenuPage() {
     setStation(item.station || 'Kitchen');
     setPrice(String(item.price ?? 0));
     setPrepMinutes(String(item.prepMinutes ?? 15));
+    setSortOrder(String(item.sortOrder ?? 0));
     setDescription(item.description || '');
     setImage(item.image || '');
     setAvailable(item.available !== false);
+    setVariations(
+      (item.variations || []).map((v: any) => ({
+        ...(v._id || v.id ? { _id: String(v._id || v.id) } : {}),
+        name: v.name || '',
+        price: String(v.price ?? 0),
+      })),
+    );
+    setAddOns(
+      (item.addOns || []).map((a: any) => ({
+        ...(a._id || a.id ? { _id: String(a._id || a.id) } : {}),
+        name: a.name || '',
+        price: String(a.price ?? 0),
+      })),
+    );
   }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1652,9 +2143,16 @@ export function RestaurantMenuPage() {
           station: station.trim() || 'Kitchen',
           price: Number(price) || 0,
           prepMinutes: Number(prepMinutes) || 15,
+          sortOrder: Number(sortOrder) || 0,
           description: description.trim(),
           image: image.trim(),
           available,
+          variations: variations
+            .filter((v) => v.name.trim())
+            .map((v) => ({ ...(v._id ? { _id: v._id } : {}), name: v.name.trim(), price: Number(v.price) || 0 })),
+          addOns: addOns
+            .filter((a) => a.name.trim())
+            .map((a) => ({ ...(a._id ? { _id: a._id } : {}), name: a.name.trim(), price: Number(a.price) || 0 })),
         },
       });
       toast.success(id ? 'Dish updated' : 'Dish created');
@@ -1799,7 +2297,7 @@ export function RestaurantMenuPage() {
       </div>
 
       <Dialog open={Boolean(editing)} onOpenChange={(open) => !open && setEditing(null)}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-xl max-h-[88vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing?._id || editing?.id ? 'Edit Dish' : 'Add New Dish'}</DialogTitle>
           </DialogHeader>
@@ -1818,17 +2316,21 @@ export function RestaurantMenuPage() {
                 <Input value={station} onChange={(e) => setStation(e.target.value)} placeholder="Kitchen / Grill / Bakery" />
               </div>
               <div className="space-y-1.5">
-                <Label>Price (PKR)</Label>
+                <Label>Base Price (PKR)</Label>
                 <Input type="number" min="0" required value={price} onChange={(e) => setPrice(e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Prep Minutes</Label>
                 <Input type="number" min="0" value={prepMinutes} onChange={(e) => setPrepMinutes(e.target.value)} />
               </div>
-              <div className="flex items-center justify-between pt-6">
-                <Label>Available</Label>
-                <Switch checked={available} onCheckedChange={setAvailable} />
+              <div className="space-y-1.5">
+                <Label>Display Order</Label>
+                <Input type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
               </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <Label>Available on Menu</Label>
+              <Switch checked={available} onCheckedChange={setAvailable} />
             </div>
             <div className="space-y-1.5">
               <Label>Description</Label>
@@ -1845,6 +2347,105 @@ export function RestaurantMenuPage() {
                 </label>
               </div>
             </div>
+
+            {/* Portion / Variations */}
+            <div className="space-y-2 rounded-lg border border-border p-3">
+              <div className="flex items-center justify-between">
+                <Label>Portion Variations (optional, e.g. Half / Full)</Label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setVariations((prev) => [...prev, { name: '', price: '' }])}
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Variation
+                </Button>
+              </div>
+              {variations.map((v, idx) => (
+                <div key={v._id || idx} className="flex items-center gap-2">
+                  <Input
+                    required
+                    placeholder="Variation name (e.g. Full)"
+                    value={v.name}
+                    onChange={(e) =>
+                      setVariations((prev) => prev.map((x, j) => (j === idx ? { ...x, name: e.target.value } : x)))
+                    }
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    required
+                    className="w-28"
+                    placeholder="Price"
+                    value={v.price}
+                    onChange={(e) =>
+                      setVariations((prev) => prev.map((x, j) => (j === idx ? { ...x, price: e.target.value } : x)))
+                    }
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="text-destructive shrink-0"
+                    onClick={() => setVariations((prev) => prev.filter((_, j) => j !== idx))}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+              {variations.length === 0 && (
+                <p className="text-xs text-muted-foreground">Single standard portion (uses Base Price).</p>
+              )}
+            </div>
+
+            {/* Optional Add-ons */}
+            <div className="space-y-2 rounded-lg border border-border p-3">
+              <div className="flex items-center justify-between">
+                <Label>Optional Add-ons (e.g. Extra Naan / Cheese)</Label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setAddOns((prev) => [...prev, { name: '', price: '' }])}
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Option
+                </Button>
+              </div>
+              {addOns.map((a, idx) => (
+                <div key={a._id || idx} className="flex items-center gap-2">
+                  <Input
+                    required
+                    placeholder="Add-on name"
+                    value={a.name}
+                    onChange={(e) =>
+                      setAddOns((prev) => prev.map((x, j) => (j === idx ? { ...x, name: e.target.value } : x)))
+                    }
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    required
+                    className="w-28"
+                    placeholder="Price"
+                    value={a.price}
+                    onChange={(e) =>
+                      setAddOns((prev) => prev.map((x, j) => (j === idx ? { ...x, price: e.target.value } : x)))
+                    }
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="text-destructive shrink-0"
+                    onClick={() => setAddOns((prev) => prev.filter((_, j) => j !== idx))}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+              {addOns.length === 0 && <p className="text-xs text-muted-foreground">No add-ons attached.</p>}
+            </div>
+
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setEditing(null)}>
                 Cancel

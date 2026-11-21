@@ -28,6 +28,7 @@ import {
 } from '@/src/pages/guest/ResortPages';
 import {
   AboutPage,
+  CirclePage,
   DetailPage,
   IndexPage,
   PlainPolicyPage,
@@ -69,9 +70,6 @@ function ScrollAndTrack() {
   const { pathname } = useLocation();
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
-    if (!pathname.startsWith('/admin')) {
-      track({ type: 'pageview', path: pathname });
-    }
   }, [pathname]);
   return null;
 }
@@ -177,9 +175,10 @@ export default function App() {
           path="/weddings"
           element={
             <TopicEnquiryPage
-              topic="Weddings & Gatherings"
-              title="Desert Celebrations & Private Huts"
-              desc="Book a block of huts with private bonfire dinners and mountain photo shoots at Katpana."
+              topic="Wedding"
+              title="Huts together, the kitchen for your table."
+              desc="A small wedding or family gathering in the desert: write to the desk with how many people, and the dates."
+              prompt="How many huts, which month, and whether you want dinner on the sand."
             />
           }
         />
@@ -187,9 +186,10 @@ export default function App() {
           path="/meetings"
           element={
             <TopicEnquiryPage
-              topic="Retreats & Offsites"
-              title="Executive Offsites & Creative Retreats"
-              desc="Quiet desert pavilions, reliable Starlink-backed Wi-Fi, and full-board catering for small teams."
+              topic="Meeting"
+              title="A quiet week to get through real work."
+              desc="Bring a small team out of town. Wi-Fi, the window seats, breakfast, and dinner on one bill."
+              prompt="How many people, how many nights, and when."
             />
           }
         />
@@ -197,29 +197,22 @@ export default function App() {
           path="/gifts"
           element={
             <TopicEnquiryPage
-              topic="Gift Stays"
-              title="Gift a Stay in Skardu"
-              desc="Flexible night vouchers for couples and families, valid across two seasons."
+              topic="Gift stay"
+              title="A stay to give, not a plastic card."
+              desc="Name the nights or an amount, and the desk writes the note for the people coming."
+              prompt="Who is it for, and when might they travel?"
             />
           }
         />
-        <Route
-          path="/circle"
-          element={
-            <TopicEnquiryPage
-              topic="Returning Guests"
-              title="Oasis Circle"
-              desc="Returning guests receive direct upgrade priority and complimentary airport pickup."
-            />
-          }
-        />
+        <Route path="/circle" element={<CirclePage />} />
         <Route
           path="/careers"
           element={
             <TopicEnquiryPage
-              topic="Careers"
-              title="Work With Us in Skardu"
-              desc="Seasonal and year-round hospitality, kitchen, and expedition roles at Katpana Desert."
+              topic="Career"
+              title="The desk, the kitchen, the house."
+              desc="We hire for the front desk, housekeeping, and the kitchen. Write with the role you want. There is no portal."
+              prompt="Which department, and a line about where you have worked."
             />
           }
         />
@@ -228,8 +221,9 @@ export default function App() {
           element={
             <TopicEnquiryPage
               topic="Press"
-              title="Media & Press Desk"
-              desc="High-resolution imagery, interview requests, and location filming inquiries."
+              title="Facts, if you are writing about the resort."
+              desc="Nineteen rooms on the Katpana cold desert, Skardu. Breakfast included. For a visit or a photograph, write first."
+              prompt="What are you writing, and when do you need an answer?"
             />
           }
         />
@@ -237,9 +231,10 @@ export default function App() {
           path="/partners"
           element={
             <TopicEnquiryPage
-              topic="Travel Partners"
-              title="Tour Operators & Travel Agents"
-              desc="Net seasonal rates and group allocations for licensed northern Pakistan tour operators."
+              topic="Partnership"
+              title="Drivers, and the lake run."
+              desc="We work with a small list of Skardu drivers for the airport and for Shangrila. If that is you, introduce yourself. We do not join loyalty coalitions or card schemes."
+              prompt="What do you do, and how would a guest meet you?"
             />
           }
         />
