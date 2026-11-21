@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { MotionConfig, motion, useReducedMotion } from 'motion/react';
 import { ArrowUp, ChevronDown, Globe, Menu, MessageCircle, Moon, ShieldCheck, Sun } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 import {
@@ -49,6 +50,8 @@ export function GuestLayout({ children }: { children: React.ReactNode }) {
   const { mode, toggleTheme } = useAppTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [hoveredNav, setHoveredNav] = useState<string | null>(null);
+  const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
     const started = Date.now();
@@ -66,9 +69,50 @@ export function GuestLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const moreActive = MORE_LINKS.some((m) => pathname === m.to || pathname.startsWith(`${m.to}/`));
+  const activeNavKey = moreActive
+    ? '__more__'
+    : PRIMARY_LINKS.find(
+        (item) => pathname === item.to || (item.to === '/stay' && pathname === '/rooms') || pathname.startsWith(`${item.to}/`),
+      )?.to ?? null;
+  const spotlightTarget = hoveredNav ?? activeNavKey;
+
+  const renderSpotlightBeam = (keyName: string) => {
+    if (spotlightTarget !== keyName) return null;
+    return (
+      <motion.span
+        layoutId="guest-nav-spotlight"
+        aria-hidden="true"
+        transition={
+          prefersReducedMotion
+            ? { duration: 0 }
+            : { type: 'spring', stiffness: 420, damping: 34 }
+        }
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+      >
+        {/* Top glowing spotlight emitter bar */}
+        <span
+          className="absolute left-1/2 top-0 h-[3px] w-7 -translate-x-1/2 rounded-b-full bg-accent"
+          style={{ boxShadow: '0 0 12px 2px var(--accent)' }}
+        />
+        {/* Soft emitter halo */}
+        <span className="absolute left-1/2 top-0 h-3 w-9 -translate-x-1/2 rounded-full bg-accent/35 blur-[4px]" />
+        {/* Conical trapezoidal beam */}
+        <span
+          className="absolute inset-0"
+          style={{
+            clipPath: 'polygon(28% 0%, 72% 0%, 100% 100%, 0% 100%)',
+            background:
+              mode === 'dark'
+                ? 'linear-gradient(180deg, rgba(232,148,58,0.44) 0%, rgba(232,148,58,0.16) 58%, rgba(232,148,58,0) 100%)'
+                : 'linear-gradient(180deg, rgba(217,119,36,0.3) 0%, rgba(217,119,36,0.1) 58%, rgba(217,119,36,0) 100%)',
+          }}
+        />
+      </motion.span>
+    );
+  };
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground" dir={lang === 'ur' ? 'rtl' : 'ltr'}>
+    <div className="relative z-10 flex min-h-screen flex-col text-foreground" dir={lang === 'ur' ? 'rtl' : 'ltr'}>
       {/* Single-row responsive Top Bar with full portal navigation */}
       <header className="sticky top-0 z-40 border-b border-border bg-card/90 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
@@ -79,53 +123,77 @@ export function GuestLayout({ children }: { children: React.ReactNode }) {
             Oasis Resort
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-5 text-[13px] font-medium text-muted-foreground" aria-label="Main navigation">
-            {PRIMARY_LINKS.map((item) => {
-              const active = pathname === item.to || (item.to === '/stay' && pathname === '/rooms') || pathname.startsWith(`${item.to}/`);
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className={`whitespace-nowrap shrink-0 transition-colors hover:text-foreground underline-offset-8 ${
-                    active ? 'text-foreground font-semibold underline decoration-accent decoration-2' : 'hover:underline decoration-border'
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
+          <MotionConfig reducedMotion="user">
+            <nav
+              onMouseLeave={() => setHoveredNav(null)}
+              className="hidden lg:flex h-11 items-center gap-0.5 overflow-hidden rounded-full border border-border/80 bg-secondary/45 px-2.5 text-[13px] font-medium text-muted-foreground shadow-inner backdrop-blur-md dark:border-white/10 dark:bg-[#0b1623]/90"
+              aria-label="Main navigation"
+            >
+              {PRIMARY_LINKS.map((item) => {
+                const active =
+                  pathname === item.to ||
+                  (item.to === '/stay' && pathname === '/rooms') ||
+                  pathname.startsWith(`${item.to}/`);
+                const lit = spotlightTarget === item.to;
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    onMouseEnter={() => setHoveredNav(item.to)}
+                    onFocus={() => setHoveredNav(item.to)}
+                    onBlur={() => setHoveredNav(null)}
+                    className={`relative flex h-full items-center px-3 xl:px-3.5 whitespace-nowrap shrink-0 transition-colors duration-150 ${
+                      active ? 'text-foreground font-semibold' : lit ? 'text-foreground' : 'hover:text-foreground'
+                    }`}
+                  >
+                    {renderSpotlightBeam(item.to)}
+                    <span className="relative z-10">{item.label}</span>
+                  </Link>
+                );
+              })}
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className={`inline-flex items-center gap-1 whitespace-nowrap shrink-0 transition-colors hover:text-foreground cursor-pointer ${
-                    moreActive ? 'text-foreground font-semibold' : ''
-                  }`}
-                >
-                  More
-                  <ChevronDown className="h-3.5 w-3.5 opacity-70" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                {MORE_LINKS.slice(0, 8).map((item) => (
-                  <DropdownMenuItem key={item.to} asChild>
-                    <Link to={item.to} className="w-full cursor-pointer">
-                      {item.label}
-                    </Link>
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                {MORE_LINKS.slice(8).map((item) => (
-                  <DropdownMenuItem key={item.to} asChild>
-                    <Link to={item.to} className="w-full cursor-pointer">
-                      {item.label}
-                    </Link>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </nav>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    onMouseEnter={() => setHoveredNav('__more__')}
+                    onFocus={() => setHoveredNav('__more__')}
+                    onBlur={() => setHoveredNav(null)}
+                    className={`relative flex h-full items-center gap-1 px-3 xl:px-3.5 whitespace-nowrap shrink-0 transition-colors duration-150 cursor-pointer ${
+                      moreActive
+                        ? 'text-foreground font-semibold'
+                        : spotlightTarget === '__more__'
+                          ? 'text-foreground'
+                          : 'hover:text-foreground'
+                    }`}
+                  >
+                    {renderSpotlightBeam('__more__')}
+                    <span className="relative z-10 inline-flex items-center gap-1">
+                      More
+                      <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                    </span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  {MORE_LINKS.slice(0, 8).map((item) => (
+                    <DropdownMenuItem key={item.to} asChild>
+                      <Link to={item.to} className="w-full cursor-pointer">
+                        {item.label}
+                      </Link>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  {MORE_LINKS.slice(8).map((item) => (
+                    <DropdownMenuItem key={item.to} asChild>
+                      <Link to={item.to} className="w-full cursor-pointer">
+                        {item.label}
+                      </Link>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </nav>
+          </MotionConfig>
 
           <div className="flex items-center gap-2.5 shrink-0">
             <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex whitespace-nowrap">

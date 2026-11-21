@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Rating } from '@mui/material';
 import { ExternalLink, Mail, MapPin, Phone } from 'lucide-react';
 import { GuestLayout } from '@/src/components/guest/GuestLayout';
+import { InfoHoverCard, ShowcaseHoverCard } from '@/src/components/guest/InteractiveHoverCard';
 import { FacilityShowcase } from '@/src/components/guest/FacilitySection';
 import { EnquiryForm } from '@/src/components/guest/EnquiryForm';
 import { ResilientImage } from '@/src/components/guest/ResilientImage';
@@ -69,24 +70,33 @@ export function ActivitiesPage() {
         />
         <div className="grid gap-6 md:grid-cols-2">
           {items.map((item) => (
-            <Card key={item.title} className="overflow-hidden">
-              {item.image && (
-                <div className="h-56">
-                  <ResilientImage src={item.image} alt={item.title} className="h-full w-full object-cover" />
-                </div>
-              )}
-              <CardContent className="p-6">
-                <h2 className="font-display text-3xl font-semibold">{item.title}</h2>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.body}</p>
-              </CardContent>
-            </Card>
+            <ShowcaseHoverCard
+              key={item.title}
+              image={item.image || photos.jeep}
+              alt={item.title}
+              kicker="Katpana Activity"
+              title={item.title}
+              description={item.body}
+              heightClass="h-72 sm:h-80"
+            />
           ))}
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card><CardContent className="p-5"><p className="text-xs uppercase tracking-wider text-muted-foreground">Cinema</p><p className="font-display mt-1 text-2xl font-semibold">Free</p><p className="text-xs text-muted-foreground mt-1">Weather permitting</p></CardContent></Card>
-          <Card><CardContent className="p-5"><p className="text-xs uppercase tracking-wider text-muted-foreground">Boards</p><p className="font-display mt-1 text-2xl font-semibold">At desk</p><p className="text-xs text-muted-foreground mt-1">No hire counter</p></CardContent></Card>
-          <Card><CardContent className="p-5"><p className="text-xs uppercase tracking-wider text-muted-foreground">Jeep</p><p className="font-display mt-1 text-2xl font-semibold">Charged</p><p className="text-xs text-muted-foreground mt-1">Posted to the room</p></CardContent></Card>
-          <Card><CardContent className="p-5"><p className="text-xs uppercase tracking-wider text-muted-foreground">Court</p><p className="font-display mt-1 text-2xl font-semibold">On site</p><p className="text-xs text-muted-foreground mt-1">Ask for a time</p></CardContent></Card>
+          {[
+            ['Cinema', 'Free', 'Weather permitting'],
+            ['Boards', 'At desk', 'No hire counter'],
+            ['Jeep', 'Charged', 'Posted to the room'],
+            ['Court', 'On site', 'Ask for a time'],
+          ].map(([label, title, detail]) => (
+            <InfoHoverCard
+              key={label}
+              label={label}
+              title={title}
+              detail={detail}
+              heightClass="min-h-[144px]"
+              revolveBorder
+            />
+          ))}
         </div>
       </div>
     </GuestLayout>
@@ -102,19 +112,24 @@ export function GalleryPage() {
         <PageHeader kicker="Gallery" title="Inside Oasis Resort" lede="The dunes, the red-roofed huts, and the kitchen." />
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
           {gallery.map(([src, alt]) => (
-            <button
+            <ShowcaseHoverCard
               key={src + alt}
-              type="button"
-              onClick={() => setActive({ src, alt })}
-              className="group overflow-hidden rounded-xl border border-border bg-card text-left cursor-pointer"
-            >
-              <ResilientImage
-                src={src}
-                alt={alt}
-                loading="lazy"
-                className="h-44 w-full object-cover transition-transform duration-300 group-hover:scale-105 md:h-56"
-              />
-            </button>
+              image={src}
+              alt={alt}
+              kicker="Oasis Archive"
+              title={alt}
+              heightClass="h-48 md:h-60"
+              actions={
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="accent"
+                  onClick={() => setActive({ src, alt })}
+                >
+                  Open Photo
+                </Button>
+              }
+            />
           ))}
         </div>
       </div>
@@ -190,9 +205,24 @@ export function DirectionsPage() {
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
-          <Card><CardContent className="p-5 space-y-1"><p className="font-mono text-xs text-accent">01 · Airport</p><h3 className="font-semibold">Land at Skardu</h3><p className="text-sm text-muted-foreground">On stays of 3+ nights, a driver waits with your name. Send your flight number.</p></CardContent></Card>
-          <Card><CardContent className="p-5 space-y-1"><p className="font-mono text-xs text-accent">02 · The Road</p><h3 className="font-semibold">Toward Katpana</h3><p className="text-sm text-muted-foreground">Ask for Oasis Resort, Katpana cold desert—not Shangrila Lake.</p></CardContent></Card>
-          <Card><CardContent className="p-5 space-y-1"><p className="font-mono text-xs text-accent">03 · Arrival</p><h3 className="font-semibold">The red roofs</h3><p className="text-sm text-muted-foreground">Private parking on site. Check-in is from 2:00 PM at the reception hut.</p></CardContent></Card>
+          <InfoHoverCard
+            label="01 · Airport"
+            title="Land at Skardu"
+            detail="On stays of 3+ nights, a driver waits with your name. Send your flight number."
+            heightClass="min-h-[164px]"
+          />
+          <InfoHoverCard
+            label="02 · The Road"
+            title="Toward Katpana"
+            detail="Ask for Oasis Resort, Katpana cold desert—not Shangrila Lake."
+            heightClass="min-h-[164px]"
+          />
+          <InfoHoverCard
+            label="03 · Arrival"
+            title="The red roofs"
+            detail="Private parking on site. Check-in is from 2:00 PM at the reception hut."
+            heightClass="min-h-[164px]"
+          />
         </div>
         <Button asChild variant="outline">
           <a href="https://maps.google.com/?q=Katpana+Cold+Desert+Skardu" target="_blank" rel="noreferrer">
@@ -216,23 +246,22 @@ export function TourPage() {
         />
         <div className="grid gap-6 md:grid-cols-2">
           {tourStops.map((stop) => (
-            <Card key={stop.title} className="overflow-hidden">
-              <div className="h-64">
-                <ResilientImage src={stop.image} alt={stop.title} className="h-full w-full object-cover" />
-              </div>
-              <CardContent className="p-6 space-y-3">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wider text-accent">{stop.kicker}</p>
-                  <h2 className="font-display text-2xl font-semibold mt-0.5">{stop.title}</h2>
-                </div>
-                <p className="text-sm leading-relaxed text-muted-foreground">{stop.body}</p>
-                <ul className="space-y-1 text-xs text-muted-foreground border-t border-border pt-3">
+            <ShowcaseHoverCard
+              key={stop.title}
+              image={stop.image}
+              alt={stop.title}
+              kicker={stop.kicker}
+              title={stop.title}
+              description={stop.body}
+              heightClass="h-80 sm:h-96"
+              extra={
+                <ul className="space-y-1 border-t border-white/15 pt-2.5 text-xs text-white/80">
                   {stop.points.map((pt) => (
                     <li key={pt}>· {pt}</li>
                   ))}
                 </ul>
-              </CardContent>
-            </Card>
+              }
+            />
           ))}
         </div>
         <div>
@@ -354,15 +383,14 @@ export function ReviewsPage() {
         <PageHeader kicker="Guest Reviews" title="From guests who booked direct" />
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {combined.map((rev, idx) => (
-            <Card key={idx}>
-              <CardContent className="flex h-full flex-col justify-between p-6 space-y-4">
-                <div className="space-y-3">
-                  <Rating value={rev.rating} readOnly size="small" />
-                  <p className="text-sm leading-relaxed text-muted-foreground">{rev.comment}</p>
-                </div>
-                <p className="text-xs font-semibold text-foreground">{rev.name}</p>
-              </CardContent>
-            </Card>
+            <InfoHoverCard
+              key={idx}
+              label={<Rating value={rev.rating} readOnly size="small" />}
+              title={rev.name}
+              detail={`“${rev.comment}”`}
+              meta="Verified Direct Stay"
+              heightClass="min-h-[192px]"
+            />
           ))}
         </div>
       </div>
@@ -381,17 +409,17 @@ export function EventsPage() {
     <GuestLayout>
       <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
         <PageHeader kicker="Events" title="Nothing here needs a ticket." />
-        <div className="space-y-6">
+        <div className="grid gap-6 md:grid-cols-3">
           {items.map(([src, title, body]) => (
-            <Card key={title} className="overflow-hidden">
-              <div className="grid md:grid-cols-[280px_1fr]">
-                <ResilientImage src={src} alt={title} className="h-48 w-full object-cover md:h-full" />
-                <CardContent className="p-6">
-                  <h2 className="font-display text-3xl font-semibold">{title}</h2>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
-                </CardContent>
-              </div>
-            </Card>
+            <ShowcaseHoverCard
+              key={title}
+              image={src}
+              alt={title}
+              kicker="Oasis Evening"
+              title={title}
+              description={body}
+              heightClass="h-80"
+            />
           ))}
         </div>
       </div>

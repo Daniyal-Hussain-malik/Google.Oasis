@@ -4,8 +4,8 @@ import { Alert, Step, StepLabel, Stepper } from '@mui/material';
 import { Minus, Plus, ShoppingBag, Trash2, UtensilsCrossed } from 'lucide-react';
 import { toast } from 'sonner';
 import { GuestLayout } from '@/src/components/guest/GuestLayout';
+import { InfoHoverCard, ShowcaseHoverCard } from '@/src/components/guest/InteractiveHoverCard';
 import { PaymentAccounts, PaymentProofForm } from '@/src/components/guest/PaymentSection';
-import { ResilientImage } from '@/src/components/guest/ResilientImage';
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
@@ -536,39 +536,43 @@ export function OrderPage() {
                     const priceLabel = hasVars
                       ? `from ${pkr(Math.min(...item.variations.map((v: any) => v.price)))}`
                       : pkr(item.price);
-                    return (
-                      <Card key={item._id} className="overflow-hidden flex flex-col justify-between">
-                        <div>
-                          {item.image && (
-                            <div className="h-44">
-                              <ResilientImage src={media(item.image)} alt={item.name} className="h-full w-full object-cover" />
-                            </div>
-                          )}
-                          <CardContent className="p-5">
-                            <div className="flex items-start justify-between gap-2">
-                              <h3 className="text-base font-semibold text-foreground">{item.name}</h3>
-                              <span className="font-mono text-sm font-semibold tabular-nums text-accent">{priceLabel}</span>
-                            </div>
-                            <p className="mt-1 text-xs text-muted-foreground">{item.category}</p>
-                            {item.description && (
-                              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{item.description}</p>
-                            )}
-                          </CardContent>
-                        </div>
-                        <div className="px-5 pb-5">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                            disabled={!canOrder}
-                            onClick={() => setActiveItem(item)}
-                          >
-                            <UtensilsCrossed className="h-3.5 w-3.5" />
-                            Add to Tray
-                          </Button>
-                        </div>
-                      </Card>
+                    const addButton = (
+                      <Button
+                        type="button"
+                        variant="accent"
+                        size="sm"
+                        className="w-full"
+                        disabled={!canOrder}
+                        onClick={() => setActiveItem(item)}
+                      >
+                        <UtensilsCrossed className="h-3.5 w-3.5" />
+                        Add to Tray
+                      </Button>
+                    );
+
+                    return item.image ? (
+                      <ShowcaseHoverCard
+                        key={item._id}
+                        image={media(item.image)}
+                        alt={item.name}
+                        kicker={item.category}
+                        price={priceLabel}
+                        title={item.name}
+                        description={item.description}
+                        heightClass="h-64"
+                        actions={addButton}
+                      />
+                    ) : (
+                      <div key={item._id} className="space-y-2">
+                        <InfoHoverCard
+                          label={item.category}
+                          title={item.name}
+                          detail={item.description || 'Prepared fresh in the Oasis kitchen.'}
+                          meta={priceLabel}
+                          heightClass="min-h-[160px]"
+                        />
+                        {addButton}
+                      </div>
                     );
                   })}
                 </div>

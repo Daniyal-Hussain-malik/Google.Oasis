@@ -114,4 +114,29 @@
   html {
     scroll-behavior: auto;
   }
+  .animate-revolve-lines {
+    animation: none !important;
+  }
 }
+
+@keyframes revolve-lines-spin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.revolve-border-mask {
+  padding: 2px;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
+.animate-revolve-lines {
+  animation: revolve-lines-spin 2.8s linear infinite;
+}
+

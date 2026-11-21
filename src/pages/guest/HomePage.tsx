@@ -16,9 +16,9 @@ import {
 import { GuestLayout } from '@/src/components/guest/GuestLayout';
 import { HeroCarousel, type HeroSlide } from '@/src/components/guest/HeroCarousel';
 import { StoryPhotoCarousel, type StorySlide } from '@/src/components/guest/StoryPhotoCarousel';
+import { InfoHoverCard, ShowcaseHoverCard } from '@/src/components/guest/InteractiveHoverCard';
 import { FacilityShowcase } from '@/src/components/guest/FacilitySection';
 import { EnquiryForm } from '@/src/components/guest/EnquiryForm';
-import { ResilientImage } from '@/src/components/guest/ResilientImage';
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent } from '@/src/components/ui/card';
 import { Input } from '@/src/components/ui/input';
@@ -210,7 +210,7 @@ export function HomePage() {
       </HeroCarousel>
 
       {/* 2. Seam-Centered Booking Bar (exact 50/50 bridge between Section 1 & Section 2) + Assurance Strip */}
-      <section className="relative flow-root border-b border-border bg-card">
+      <section className="relative flow-root border-b border-border bg-card/75 backdrop-blur-[2px]">
         <div
           ref={bookingCardRef}
           style={{ marginTop: -bookingHalfHeight }}
@@ -409,51 +409,33 @@ export function HomePage() {
           {types.slice(0, 5).map((raw, index) => {
             const room = presentStay(raw);
             return (
-              <Card
+              <ShowcaseHoverCard
                 key={room._id}
-                className={`overflow-hidden transition-colors hover:border-accent/50 ${
-                  index === 0 ? 'md:col-span-2 lg:col-span-2' : ''
-                }`}
-              >
-                <div className={index === 0 ? 'grid h-full md:grid-cols-2' : 'flex h-full flex-col'}>
-                  <div className={index === 0 ? 'h-64 md:h-full' : 'h-56'}>
-                    <ResilientImage
-                      src={room.image}
-                      alt={room.name}
-                      fallbackTitle={room.name}
-                      className="h-full w-full object-cover"
-                    />
+                image={room.image}
+                alt={room.name}
+                fallbackTitle={room.name}
+                kicker={[room.bed, room.size, `${room.maxAdults} adults`].filter(Boolean).join(' · ')}
+                title={room.name}
+                description={room.description}
+                price={`${t.from} ${pkr(room.baseRate)} / night`}
+                heightClass="h-80 sm:h-[22rem]"
+                className={index === 0 ? 'md:col-span-2 lg:col-span-2' : ''}
+                actions={
+                  <div className="flex w-full items-center justify-between gap-2">
+                    <span className="text-xs text-white/75">Breakfast included</span>
+                    <Button asChild size="sm" variant="accent">
+                      <Link to={`/book?type=${room._id}`}>{t.choose}</Link>
+                    </Button>
                   </div>
-                  <CardContent className="flex flex-1 flex-col justify-between p-6">
-                    <div className="space-y-3">
-                      <p className="text-xs text-muted-foreground">
-                        {[room.bed, room.size, `${room.maxAdults} adults`].filter(Boolean).join(' · ')}
-                      </p>
-                      <h3 className="font-display text-3xl font-semibold text-foreground">{room.name}</h3>
-                      <p className="text-sm leading-relaxed text-muted-foreground">{room.description}</p>
-                    </div>
-                    <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
-                      <div>
-                        <span className="text-xs text-muted-foreground">{t.from} </span>
-                        <span className="font-mono text-lg font-semibold tabular-nums text-foreground">
-                          {pkr(room.baseRate)}
-                        </span>
-                        <span className="text-xs text-muted-foreground"> / night</span>
-                      </div>
-                      <Button asChild size="sm" variant="default">
-                        <Link to={`/book?type=${room._id}`}>{t.choose}</Link>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </div>
-              </Card>
+                }
+              />
             );
           })}
         </div>
       </section>
 
       {/* 5. From the Resort — Live CMS Activities ("Days on the sand") */}
-      <section className="border-y border-border bg-card py-16">
+      <section className="border-y border-border bg-card/75 py-16 backdrop-blur-[2px]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
@@ -469,19 +451,15 @@ export function HomePage() {
 
           <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {liveActivities.slice(0, 4).map((act, idx) => (
-              <Card key={`${act.title}-${idx}`} className="overflow-hidden">
-                <div className="h-44">
-                  <ResilientImage
-                    src={media(act.image) || official.jeep}
-                    alt={act.title}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <CardContent className="p-5 space-y-2">
-                  <h3 className="font-display text-2xl font-semibold">{act.title}</h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground">{act.body}</p>
-                </CardContent>
-              </Card>
+              <ShowcaseHoverCard
+                key={`${act.title}-${idx}`}
+                image={media(act.image) || official.jeep}
+                alt={act.title}
+                kicker="Desert Activity"
+                title={act.title}
+                description={act.body}
+                heightClass="h-72"
+              />
             ))}
           </div>
         </div>
@@ -502,22 +480,22 @@ export function HomePage() {
             [photos.executive, 'The executive room', 'Heavier curtains, the same view, and chairs by the window.'],
             [photos.breakfast, 'Breakfast, included', 'Eggs, toast, tea, and jam. Ask the night before if you want the tray at the hut.'],
           ].map(([src, title, text]) => (
-            <Card key={title} className="overflow-hidden">
-              <div className="h-48">
-                <ResilientImage src={src} alt={title} className="h-full w-full object-cover" />
-              </div>
-              <CardContent className="p-5 space-y-2">
-                <h3 className="font-display text-2xl font-semibold">{title}</h3>
-                <p className="text-sm text-muted-foreground">{text}</p>
-              </CardContent>
-            </Card>
+            <ShowcaseHoverCard
+              key={title}
+              image={src}
+              alt={title}
+              kicker="Inside Oasis"
+              title={title}
+              description={text}
+              heightClass="h-72"
+            />
           ))}
         </div>
       </section>
 
       {/* 7. The Kitchen & Dining */}
       {dishes.length > 0 && (
-        <section className="border-y border-border bg-card py-16">
+        <section className="border-y border-border bg-card/75 py-16 backdrop-blur-[2px]">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
@@ -537,23 +515,22 @@ export function HomePage() {
 
             <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {dishes.map((dish) => (
-                <Card key={dish._id} className="overflow-hidden">
-                  <div className="h-44">
-                    <ResilientImage
-                      src={media(dish.image)}
-                      alt={dish.name}
-                      fallbackTitle={dish.name}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                  <CardContent className="p-4">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-foreground">{dish.name}</h3>
-                      <span className="font-mono text-xs font-semibold tabular-nums text-accent">{pkr(dish.price)}</span>
-                    </div>
-                    <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2">{dish.description}</p>
-                  </CardContent>
-                </Card>
+                <ShowcaseHoverCard
+                  key={dish._id}
+                  image={media(dish.image)}
+                  alt={dish.name}
+                  fallbackTitle={dish.name}
+                  kicker={dish.category || 'Kitchen'}
+                  price={pkr(dish.price)}
+                  title={dish.name}
+                  description={dish.description}
+                  heightClass="h-72"
+                  actions={
+                    <Link to="/order" className="text-xs font-semibold text-amber-300 hover:underline">
+                      Order to hut →
+                    </Link>
+                  }
+                />
               ))}
             </div>
           </div>
@@ -571,7 +548,7 @@ export function HomePage() {
             <Link to="/facilities">All facilities</Link>
           </Button>
         </div>
-        <FacilityShowcase compact />
+        <FacilityShowcase compact revolveBorder />
       </section>
 
       {/* 9. Experiences (Live CMS Experiences + Signature Outings) */}
@@ -619,29 +596,26 @@ export function HomePage() {
                 },
               ]
           ).map((card) => (
-            <Card key={card.title} className="overflow-hidden flex flex-col justify-between">
-              <div>
-                <div className="h-52">
-                  <ResilientImage src={card.img} alt={card.title} className="h-full w-full object-cover" />
-                </div>
-                <CardContent className="p-6 space-y-2">
-                  <p className="text-xs text-muted-foreground">{card.kicker}</p>
-                  <h3 className="font-display text-2xl font-semibold">{card.title}</h3>
-                  <p className="text-sm text-muted-foreground">{card.summary}</p>
-                </CardContent>
-              </div>
-              <div className="px-6 pb-6">
-                <Link to={card.to} className="text-sm font-medium text-accent hover:underline">
+            <ShowcaseHoverCard
+              key={card.title}
+              image={card.img}
+              alt={card.title}
+              kicker={card.kicker}
+              title={card.title}
+              description={card.summary}
+              heightClass="h-80"
+              actions={
+                <Link to={card.to} className="text-xs font-semibold text-amber-300 hover:underline">
                   Read more →
                 </Link>
-              </div>
-            </Card>
+              }
+            />
           ))}
         </div>
       </section>
 
       {/* 10. Resort Journal / Blog & Guest Reviews */}
-      <section className="border-y border-border bg-card py-16">
+      <section className="border-y border-border bg-card/75 py-16 backdrop-blur-[2px]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-14">
           <div>
             <div className="flex flex-wrap items-end justify-between gap-4">
@@ -655,23 +629,20 @@ export function HomePage() {
             </div>
             <div className="mt-8 grid gap-6 md:grid-cols-3">
               {(blogPosts.length ? blogPosts : journals).slice(0, 3).map((post: any) => (
-                <Card key={post.slug} className="overflow-hidden flex flex-col justify-between">
-                  <div>
-                    <div className="h-44">
-                      <ResilientImage src={media(post.image) || photos.wide} alt={post.title} className="h-full w-full object-cover" />
-                    </div>
-                    <CardContent className="p-5 space-y-2">
-                      <p className="text-xs text-muted-foreground">{post.authorName || post.kicker || 'Oasis Team'}</p>
-                      <h3 className="font-display text-2xl font-semibold">{post.title}</h3>
-                      <p className="text-sm text-muted-foreground line-clamp-3">{post.excerpt || post.summary}</p>
-                    </CardContent>
-                  </div>
-                  <div className="px-5 pb-5">
-                    <Link to={`/blog/${post.slug}`} className="text-sm font-medium text-accent hover:underline">
+                <ShowcaseHoverCard
+                  key={post.slug}
+                  image={media(post.image) || photos.wide}
+                  alt={post.title}
+                  kicker={post.authorName || post.kicker || 'Oasis Team'}
+                  title={post.title}
+                  description={post.excerpt || post.summary}
+                  heightClass="h-72"
+                  actions={
+                    <Link to={`/blog/${post.slug}`} className="text-xs font-semibold text-amber-300 hover:underline">
                       Read story →
                     </Link>
-                  </div>
-                </Card>
+                  }
+                />
               ))}
             </div>
           </div>
@@ -688,13 +659,14 @@ export function HomePage() {
             </div>
             <div className="mt-8 grid gap-6 md:grid-cols-3">
               {visibleReviews.map((rev, i) => (
-                <Card key={i}>
-                  <CardContent className="p-6 space-y-3">
-                    <Rating value={rev.rating} readOnly size="small" />
-                    <p className="text-sm leading-relaxed text-muted-foreground">“{rev.comment}”</p>
-                    <p className="text-sm font-semibold text-foreground">{rev.guestName}</p>
-                  </CardContent>
-                </Card>
+                <InfoHoverCard
+                  key={i}
+                  label={<Rating value={rev.rating} readOnly size="small" />}
+                  title={rev.guestName}
+                  detail={`“${rev.comment}”`}
+                  meta="Verified Direct Stay"
+                  heightClass="min-h-[188px]"
+                />
               ))}
             </div>
           </div>

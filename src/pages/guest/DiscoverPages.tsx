@@ -4,6 +4,7 @@ import { Alert } from '@mui/material';
 import { ArrowLeft, BadgeCheck, PenLine, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { GuestLayout } from '@/src/components/guest/GuestLayout';
+import { InfoHoverCard, ShowcaseHoverCard } from '@/src/components/guest/InteractiveHoverCard';
 import { EnquiryForm } from '@/src/components/guest/EnquiryForm';
 import { ResilientImage } from '@/src/components/guest/ResilientImage';
 import { Button } from '@/src/components/ui/button';
@@ -110,28 +111,27 @@ export function IndexPage({ kind }: { kind: keyof typeof KIND_MAP }) {
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => (
-            <Card key={item.slug} className="overflow-hidden flex flex-col justify-between hover:border-accent/50 transition-colors">
-              <div>
-                <div className="h-52">
-                  <ResilientImage src={item.image} alt={item.title} className="h-full w-full object-cover" />
+            <ShowcaseHoverCard
+              key={item.slug}
+              image={item.image}
+              alt={item.title}
+              kicker={item.kicker}
+              title={item.title}
+              description={item.summary}
+              heightClass="h-80"
+              actions={
+                <div className="flex w-full items-center justify-between gap-2">
+                  <Link to={`${meta.basePath}/${item.slug}`} className="text-xs font-semibold text-amber-300 hover:underline">
+                    Read more →
+                  </Link>
+                  {item.book && (
+                    <Button asChild variant="accent" size="sm">
+                      <Link to={`/book?offer=${encodeURIComponent(item.title)}`}>Book with offer</Link>
+                    </Button>
+                  )}
                 </div>
-                <CardContent className="p-6 space-y-2">
-                  <p className="text-xs text-muted-foreground">{item.kicker}</p>
-                  <h2 className="font-display text-2xl font-semibold">{item.title}</h2>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{item.summary}</p>
-                </CardContent>
-              </div>
-              <div className="px-6 pb-6 flex items-center justify-between gap-2">
-                <Link to={`${meta.basePath}/${item.slug}`} className="text-sm font-medium text-accent hover:underline">
-                  Read more →
-                </Link>
-                {item.book && (
-                  <Button asChild variant="outline" size="sm">
-                    <Link to={`/book?offer=${encodeURIComponent(item.title)}`}>Book with offer</Link>
-                  </Button>
-                )}
-              </div>
-            </Card>
+              }
+            />
           ))}
         </div>
 
@@ -147,18 +147,34 @@ export function IndexPage({ kind }: { kind: keyof typeof KIND_MAP }) {
               </Button>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {menuItems.map((dish) => (
-                <Card key={dish._id}>
-                  <CardContent className="p-4 space-y-1">
-                    <div className="flex justify-between gap-2">
-                      <p className="text-sm font-semibold">{dish.name}</p>
-                      <span className="font-mono text-xs font-semibold tabular-nums text-accent">{pkr(dish.price)}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{dish.category}</p>
-                    <p className="text-xs text-muted-foreground pt-1">{dish.description}</p>
-                  </CardContent>
-                </Card>
-              ))}
+              {menuItems.map((dish) =>
+                dish.image ? (
+                  <ShowcaseHoverCard
+                    key={dish._id}
+                    image={media(dish.image)}
+                    alt={dish.name}
+                    kicker={dish.category}
+                    price={pkr(dish.price)}
+                    title={dish.name}
+                    description={dish.description}
+                    heightClass="h-64"
+                    actions={
+                      <Link to="/order" className="text-xs font-semibold text-amber-300 hover:underline">
+                        Order to hut →
+                      </Link>
+                    }
+                  />
+                ) : (
+                  <InfoHoverCard
+                    key={dish._id}
+                    label={dish.category}
+                    title={dish.name}
+                    detail={dish.description || 'Prepared fresh in the Oasis kitchen.'}
+                    meta={pkr(dish.price)}
+                    heightClass="min-h-[160px]"
+                  />
+                ),
+              )}
             </div>
           </div>
         )}
@@ -166,13 +182,14 @@ export function IndexPage({ kind }: { kind: keyof typeof KIND_MAP }) {
         {guide?.facts && (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {guide.facts.map((fact) => (
-              <Card key={fact.label}>
-                <CardContent className="p-5">
-                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{fact.label}</p>
-                  <p className="font-display mt-1 text-2xl font-semibold">{fact.value}</p>
-                  {fact.note && <p className="mt-1 text-xs text-muted-foreground">{fact.note}</p>}
-                </CardContent>
-              </Card>
+              <InfoHoverCard
+                key={fact.label}
+                label={fact.label}
+                title={fact.value}
+                detail={fact.note || fact.value}
+                heightClass="min-h-[156px]"
+                revolveBorder
+              />
             ))}
           </div>
         )}
@@ -182,13 +199,13 @@ export function IndexPage({ kind }: { kind: keyof typeof KIND_MAP }) {
             <h2 className="font-display text-2xl font-semibold">{guide.stepsTitle}</h2>
             <div className="grid gap-4 md:grid-cols-3">
               {guide.steps.map((s, i) => (
-                <Card key={s.title}>
-                  <CardContent className="p-5 space-y-1.5">
-                    <p className="font-mono text-xs font-semibold text-accent">0{i + 1}</p>
-                    <h3 className="font-semibold text-base">{s.title}</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{s.body}</p>
-                  </CardContent>
-                </Card>
+                <InfoHoverCard
+                  key={s.title}
+                  label={`0${i + 1}`}
+                  title={s.title}
+                  detail={s.body}
+                  heightClass="min-h-[168px]"
+                />
               ))}
             </div>
           </div>
@@ -199,12 +216,12 @@ export function IndexPage({ kind }: { kind: keyof typeof KIND_MAP }) {
             <h2 className="font-display text-2xl font-semibold">{guide.cardsTitle}</h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {guide.cards.map((c) => (
-                <Card key={c.title}>
-                  <CardContent className="p-5 space-y-1.5">
-                    <h3 className="font-semibold text-base">{c.title}</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{c.body}</p>
-                  </CardContent>
-                </Card>
+                <InfoHoverCard
+                  key={c.title}
+                  title={c.title}
+                  detail={c.body}
+                  heightClass="min-h-[168px]"
+                />
               ))}
             </div>
           </div>
@@ -471,26 +488,39 @@ export function AboutPage() {
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {collections.map((c) => (
-            <Link key={c.slug} to={c.to} className="group block">
-              <Card className="overflow-hidden h-full transition-colors group-hover:border-accent/60">
-                <div className="h-48">
-                  <ResilientImage src={c.image} alt={c.title} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                </div>
-                <CardContent className="p-5 space-y-1.5">
-                  <p className="text-xs font-medium uppercase tracking-wider text-accent">{c.kicker}</p>
-                  <h2 className="font-display text-2xl font-semibold">{c.title}</h2>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{c.summary}</p>
-                </CardContent>
-              </Card>
-            </Link>
+            <ShowcaseHoverCard
+              key={c.slug}
+              image={c.image}
+              alt={c.title}
+              kicker={c.kicker}
+              title={c.title}
+              description={c.summary}
+              heightClass="h-72"
+              actions={
+                <Link to={c.to} className="text-xs font-semibold text-amber-300 hover:underline">
+                  Explore →
+                </Link>
+              }
+            />
           ))}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card><CardContent className="p-5"><p className="text-xs uppercase tracking-wider text-muted-foreground">Grounds</p><p className="font-display mt-1 text-2xl font-semibold">~165 kanals</p><p className="text-xs text-muted-foreground mt-1">Facing Katpana desert</p></CardContent></Card>
-          <Card><CardContent className="p-5"><p className="text-xs uppercase tracking-wider text-muted-foreground">Rooms</p><p className="font-display mt-1 text-2xl font-semibold">19 Huts</p><p className="text-xs text-muted-foreground mt-1">Held in our own book</p></CardContent></Card>
-          <Card><CardContent className="p-5"><p className="text-xs uppercase tracking-wider text-muted-foreground">Airport</p><p className="font-display mt-1 text-2xl font-semibold">15 min</p><p className="text-xs text-muted-foreground mt-1">Car free from 3 nights</p></CardContent></Card>
-          <Card><CardContent className="p-5"><p className="text-xs uppercase tracking-wider text-muted-foreground">Kitchen</p><p className="font-display mt-1 text-2xl font-semibold">One house</p><p className="text-xs text-muted-foreground mt-1">Breakfast always included</p></CardContent></Card>
+          {[
+            ['Grounds', '~165 kanals', 'Facing Katpana desert'],
+            ['Rooms', '19 Huts', 'Held in our own book'],
+            ['Airport', '15 min', 'Car free from 3 nights'],
+            ['Kitchen', 'One house', 'Breakfast always included'],
+          ].map(([label, title, detail]) => (
+            <InfoHoverCard
+              key={label}
+              label={label}
+              title={title}
+              detail={detail}
+              heightClass="min-h-[144px]"
+              revolveBorder
+            />
+          ))}
         </div>
       </div>
     </GuestLayout>
@@ -508,12 +538,12 @@ export function WellnessPage() {
         </div>
         <div className="grid gap-6 md:grid-cols-3">
           {wellness.map((w) => (
-            <Card key={w.title}>
-              <CardContent className="p-6 space-y-2">
-                <h2 className="font-display text-2xl font-semibold">{w.title}</h2>
-                <p className="text-sm leading-relaxed text-muted-foreground">{w.body}</p>
-              </CardContent>
-            </Card>
+            <InfoHoverCard
+              key={w.title}
+              title={w.title}
+              detail={w.body}
+              heightClass="min-h-[176px]"
+            />
           ))}
         </div>
       </div>

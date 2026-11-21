@@ -11,7 +11,7 @@ import {
   Mountain,
   CheckCircle2,
 } from 'lucide-react';
-import { Card, CardContent } from '@/src/components/ui/card';
+import { InfoHoverCard } from '@/src/components/guest/InteractiveHoverCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/src/components/ui/tabs';
 import { api } from '@/src/lib/api';
 
@@ -36,7 +36,7 @@ const iconMap: Record<string, React.ReactNode> = {
   star: <CheckCircle2 className="h-5 w-5" />,
 };
 
-export function FacilityShowcase({ compact = false }: { compact?: boolean }) {
+export function FacilityShowcase({ compact = false, revolveBorder = false }: { compact?: boolean; revolveBorder?: boolean }) {
   const [items, setItems] = useState<FacilityItem[]>([]);
   const [group, setGroup] = useState('All');
 
@@ -69,22 +69,14 @@ export function FacilityShowcase({ compact = false }: { compact?: boolean }) {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((item) => (
-          <Card key={item.name} className="transition-colors hover:border-accent/50">
-            <CardContent className="flex items-start gap-4 p-5">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
-                {iconMap[item.icon] || <ShieldCheck className="h-5 w-5" />}
-              </div>
-              <div className="min-w-0 space-y-1">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-foreground">{item.name}</h3>
-                </div>
-                <p className="text-xs leading-relaxed text-muted-foreground">{item.detail}</p>
-                <p className="pt-1 text-xs text-muted-foreground/80">
-                  {item.group} · {item.tag}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <InfoHoverCard
+            key={item.name}
+            icon={iconMap[item.icon] || <ShieldCheck className="h-5 w-5" />}
+            title={item.name}
+            detail={item.detail}
+            meta={[item.group, item.tag].filter(Boolean).join(' · ')}
+            revolveBorder={revolveBorder}
+          />
         ))}
       </div>
     </div>

@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { LinearProgress } from '@mui/material';
 import { Button } from '@/src/components/ui/button';
+import { SiteBackdrop } from '@/src/components/ui/site-backdrop';
 import { GuestLayout } from '@/src/components/guest/GuestLayout';
 import { StaffRole, SUPER, FRONT, FLOOR, useAdminAuth } from '@/src/context/AdminAuthContext';
 import { track } from '@/src/lib/api';
@@ -84,7 +85,7 @@ function RequireStaff({ roles, children }: { roles: StaffRole[]; children: React
 
   if (!ready) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6">
+      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center p-6">
         <div className="w-64 space-y-3 text-center">
           <p className="font-display text-xl text-foreground">Loading Operations Desk…</p>
           <LinearProgress />
@@ -128,6 +129,7 @@ function NotFoundPage() {
 export default function App() {
   return (
     <>
+      <SiteBackdrop />
       <ScrollAndTrack />
       <Routes>
         {/* Public Guest Routes */}

@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BedDouble, Eye, Users } from 'lucide-react';
+import { Eye } from 'lucide-react';
 import { GuestLayout } from '@/src/components/guest/GuestLayout';
+import { ShowcaseHoverCard } from '@/src/components/guest/InteractiveHoverCard';
 import { ResilientImage } from '@/src/components/guest/ResilientImage';
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent } from '@/src/components/ui/card';
@@ -139,76 +140,46 @@ export function RoomsPage() {
           </Card>
         )}
 
-        <div className="mt-8 space-y-6">
+        <div className="mt-8 grid gap-6 md:grid-cols-2">
           {filtered.map((raw) => {
             const room = presentStay(raw);
             return (
-              <Card key={room._id} className="overflow-hidden transition-colors hover:border-accent/50">
-                <div className="grid md:grid-cols-[0.85fr_1.15fr]">
-                  <div className="h-60 md:h-full min-h-[240px]">
-                    <ResilientImage
-                      src={room.image}
-                      alt={room.name}
-                      fallbackTitle={room.name}
-                      className="h-full w-full object-cover"
-                    />
+              <ShowcaseHoverCard
+                key={room._id}
+                image={room.image}
+                alt={room.name}
+                fallbackTitle={room.name}
+                kicker={[room.bed, room.size, `${room.maxAdults} adults${room.maxChildren ? `, ${room.maxChildren} children` : ''}`].filter(Boolean).join(' · ')}
+                price={`${pkr(room.baseRate)} / night`}
+                title={room.name}
+                description={room.description}
+                meta={
+                  room.amenities?.length
+                    ? `Included: ${room.amenities.join(' · ')} · Weekend ${pkr(room.weekendRate || room.baseRate)}`
+                    : `Weekend ${pkr(room.weekendRate || room.baseRate)}`
+                }
+                heightClass="h-80 sm:h-96"
+                actions={
+                  <div className="flex w-full flex-wrap items-center justify-between gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-white/30 bg-white/10 text-white hover:bg-white/20"
+                      onClick={() => {
+                        track({ type: 'room_view', path: '/rooms', roomName: room.name });
+                        setPreviewRoom(room);
+                      }}
+                    >
+                      <Eye className="h-4 w-4" />
+                      Details
+                    </Button>
+                    <Button asChild variant="accent" size="sm">
+                      <Link to={`/book?type=${room._id}`}>Check Dates</Link>
+                    </Button>
                   </div>
-                  <CardContent className="flex flex-col justify-between p-6 sm:p-8">
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                        <span className="inline-flex items-center gap-1">
-                          <BedDouble className="h-3.5 w-3.5" /> {room.bed}
-                        </span>
-                        <span>·</span>
-                        <span>{room.size}</span>
-                        <span>·</span>
-                        <span className="inline-flex items-center gap-1">
-                          <Users className="h-3.5 w-3.5" /> {room.maxAdults} adults
-                          {room.maxChildren ? `, ${room.maxChildren} children` : ''}
-                        </span>
-                      </div>
-
-                      <h2 className="font-display text-3xl font-semibold text-foreground">{room.name}</h2>
-                      <p className="text-sm leading-relaxed text-muted-foreground">{room.description}</p>
-
-                      {room.amenities?.length > 0 && (
-                        <p className="pt-1 text-xs text-muted-foreground">
-                          <span className="font-medium text-foreground">Included:</span>{' '}
-                          {room.amenities.join(' · ')}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-4">
-                      <div>
-                        <p className="font-mono text-2xl font-semibold tabular-nums text-foreground">
-                          {pkr(room.baseRate)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          per night · Weekend {pkr(room.weekendRate || room.baseRate)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            track({ type: 'room_view', path: '/rooms', roomName: room.name });
-                            setPreviewRoom(room);
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
-                          Details
-                        </Button>
-                        <Button asChild variant="accent" size="sm">
-                          <Link to={`/book?type=${room._id}`}>Check Dates</Link>
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </div>
-              </Card>
+                }
+              />
             );
           })}
         </div>
