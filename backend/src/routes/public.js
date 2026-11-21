@@ -69,7 +69,7 @@ router.get('/menu', async (req, res) => {
 
 router.get('/reviews', async (req, res) => {
   const rows = await Feedback.findAll({ where: { published: true }, order: [['createdAt', 'DESC']], limit: 30 });
-  res.json(rows.map((r) => ({ id: r._id, guestName: r.guestName, rating: r.rating, comment: r.comment, createdAt: r.createdAt })));
+  res.json(rows.map((r) => ({ id: r._id, guestName: r.guestName, stayTitle: r.stayTitle || undefined, rating: r.rating, comment: r.comment, createdAt: r.createdAt })));
 });
 
 router.get('/availability', async (req, res) => {
@@ -135,22 +135,60 @@ router.post('/reservations/lookup', formLimit, async (req, res) => {
 
 router.post('/feedback', formLimit, async (req, res) => {
   const body = req.body || {};
-  const reservation = await findGuestBooking(body);
-  if (reservation.status !== 'checked_out') throw badRequest('Feedback opens after checkout.');
   const rating = int(body.rating, 0);
-  if (rating < 1 || rating > 5) throw badRequest('Choose a rating from 1 to 5.');
+  if (rating < 1 || rating > 5) throw badRequest('Choose a rating from 1 to 5.', { rating: 'Required' });
 
-  // One rating per stay: a second submission replaces the first.
-  const data = { bookingNumber: reservation.bookingNumber, guestName: reservation.guestName, rating, comment: text(body.comment, 2000) };
-  let feedback = await Feedback.findOne({ where: { reservation: reservation.id } });
-  if (feedback) {
-    feedback.set(data);
-    await feedback.save();
-  } else {
-    feedback = await Feedback.create({ reservation: reservation.id, ...data });
+  // Verified post-checkout booking review flow (used from /booking lookup page).
+  if (body.bookingNumber && body.phone) {
+    const reservation = await findGuestBooking(body);
+    if (reservation.status !== 'checked_out') throw badRequest('Feedback opens after checkout.');
+
+    // One rating per stay: a second submission replaces the first.
+    const data = { bookingNumber: reservation.bookingNumber, guestName: reservation.guestName, rating, comment: text(body.comment, 2000) };
+    let feedback = await Feedback.findOne({ where: { reservation: reservation.id } });
+    if (feedback) {
+      feedback.set(data);
+      await feedback.save();
+    } else {
+      feedback = await Feedback.create({ reservation: reservation.id, ...data });
+    }
+    feedbackReceived(feedback);
+    return res.status(201).json({ ok: true, id: feedback._id, rating: feedback.rating });
   }
+
+  // Open HomePage Guest Feedback flow (appears immediately in AdminFeedbackPage for management review).
+  const guestName = text(body.guestName, 120);
+  const email = text(body.email, 120).toLowerCase();
+  const stayTitle = text(body.stayTitle, 120);
+  const comment = text(body.comment, 2000);
+
+  if (guestName.length < 2) throw badRequest('Please enter your name.', { guestName: 'Required' });
+  if (email && !isEmail(email)) throw badRequest('Please enter a valid email address.', { email: 'Invalid' });
+  if (comment.length < 5) throw badRequest('Please share a few words about your experience.', { comment: 'Required' });
+
+  const recent = await Feedback.findOne({
+    where: {
+      reservation: null,
+      guestName,
+      rating,
+      comment,
+      createdAt: { [Op.gte]: new Date(Date.now() - 10 * 60 * 1000) },
+    },
+  });
+  if (recent) return res.status(200).json({ ok: true, id: recent._id, rating: recent.rating });
+
+  const feedback = await Feedback.create({
+    reservation: null,
+    bookingNumber: 'HOMEPAGE',
+    guestName,
+    email,
+    stayTitle,
+    rating,
+    comment,
+    published: false,
+  });
   feedbackReceived(feedback);
-  res.status(201).json({ ok: true, rating: feedback.rating });
+  res.status(201).json({ ok: true, id: feedback._id, rating: feedback.rating });
 });
 
 router.post('/enquiries', formLimit, async (req, res) => {

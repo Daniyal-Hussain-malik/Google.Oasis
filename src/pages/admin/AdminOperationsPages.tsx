@@ -334,9 +334,14 @@ export function AdminEnquiriesPage() {
 export function AdminFeedbackPage() {
   const { can } = useAdminAuth();
   const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
-    adminApi<any[]>('/admin/feedback').then(setItems).catch((err) => toast.error(err.message));
+    setLoading(true);
+    adminApi<any[]>('/admin/feedback')
+      .then(setItems)
+      .catch((err) => toast.error(err.message))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -356,29 +361,67 @@ export function AdminFeedbackPage() {
   return (
     <AdminLayout title="Guest Feedback">
       <div className="space-y-6">
-        <h1 className="font-display text-3xl font-semibold">Guest Ratings &amp; Reviews</h1>
-        <div className="grid gap-4 md:grid-cols-2">
-          {items.map((item) => (
-            <Card key={item._id}>
-              <CardContent className="p-5 space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">{item.guestName}</p>
-                    <p className="font-mono text-xs text-muted-foreground">{item.bookingNumber}</p>
-                  </div>
-                  <Rating value={item.rating} readOnly size="small" />
-                </div>
-                <p className="text-sm text-muted-foreground">{item.comment || 'No written comment'}</p>
-                {can(...SUPER) && (
-                  <div className="flex items-center justify-between border-t border-border pt-3 text-xs">
-                    <span>Show on public Reviews page</span>
-                    <Switch checked={Boolean(item.published)} onCheckedChange={(v) => togglePublish(item, v)} />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="font-display text-3xl font-semibold">Guest Ratings &amp; Feedback</h1>
+            <p className="text-sm text-muted-foreground">
+              {items.length} {items.length === 1 ? 'submission' : 'submissions'} from the home page &amp; checked-out stays.
+            </p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
+
+        {items.length === 0 && !loading ? (
+          <Card>
+            <CardContent className="p-8 text-center text-sm text-muted-foreground">
+              No guest feedback recorded yet. Submissions from the Home page Guest Feedback form appear here automatically.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {items.map((item) => {
+              const isHomePage = !item.bookingNumber || item.bookingNumber === 'HOMEPAGE';
+              const createdLabel = item.createdAt
+                ? new Date(item.createdAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })
+                : '';
+
+              return (
+                <Card key={item._id}>
+                  <CardContent className="p-5 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <p className="font-semibold text-foreground">{item.guestName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-mono">
+                            {isHomePage ? 'Home Page Feedback' : `Booking ${item.bookingNumber}`}
+                          </span>
+                          {item.stayTitle ? ` · ${item.stayTitle}` : ''}
+                          {createdLabel ? ` · ${createdLabel}` : ''}
+                        </p>
+                        {item.email && (
+                          <p className="text-xs text-muted-foreground">{item.email}</p>
+                        )}
+                      </div>
+                      <Rating value={item.rating} readOnly size="small" />
+                    </div>
+                    <p className="text-sm leading-relaxed text-foreground/90">{item.comment || 'No written comment'}</p>
+                    {can(...SUPER) && (
+                      <div className="flex items-center justify-between border-t border-border pt-3 text-xs">
+                        <span className="text-muted-foreground">
+                          {item.published ? 'Published on Guest Reviews & Home page' : 'Pending approval · Hidden from public site'}
+                        </span>
+                        <Switch checked={Boolean(item.published)} onCheckedChange={(v) => togglePublish(item, v)} />
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
     </AdminLayout>
   );

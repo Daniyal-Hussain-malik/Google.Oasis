@@ -1,18 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Rating } from '@mui/material';
+import { Alert, Rating } from '@mui/material';
 import { motion } from 'motion/react';
 import {
   ArrowRight,
   Calendar,
   Car,
+  CheckCircle2,
   ChevronDown,
   Coffee,
   Flame,
+  MessageSquareHeart,
+  Send,
+  ShieldCheck,
   Sparkles,
+  Star,
   Tag,
   Users,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { GuestLayout } from '@/src/components/guest/GuestLayout';
 import { HeroCarousel, type HeroSlide } from '@/src/components/guest/HeroCarousel';
 import { StoryPhotoCarousel, type StorySlide } from '@/src/components/guest/StoryPhotoCarousel';
@@ -22,8 +28,11 @@ import { EnquiryForm } from '@/src/components/guest/EnquiryForm';
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent } from '@/src/components/ui/card';
 import { Input } from '@/src/components/ui/input';
+import { Label } from '@/src/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/src/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/src/components/ui/select';
 import { Separator } from '@/src/components/ui/separator';
+import { Textarea } from '@/src/components/ui/textarea';
 import { useI18n } from '@/src/context/I18nContext';
 import { addDays, api, clamp, media, pkr, todayISO } from '@/src/lib/api';
 import { defaultReviews, journals, official, photos, presentStay } from '@/src/data/resortContent';
@@ -49,6 +58,16 @@ export function HomePage() {
     children: 0,
     rooms: 1,
   });
+  const [feedbackForm, setFeedbackForm] = useState({
+    guestName: '',
+    email: '',
+    stayTitle: 'Overall Stay',
+    rating: 5 as number | null,
+    comment: '',
+  });
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
+  const [feedbackError, setFeedbackError] = useState('');
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState<{ guestName: string; rating: number } | null>(null);
 
   useEffect(() => {
     api<{ businessDate: string }>('/public/hotel')
@@ -113,6 +132,56 @@ export function HomePage() {
     });
     if (promoCode.trim()) params.set('offer', promoCode.trim());
     navigate(`/book?${params.toString()}`);
+  }
+
+  async function handleGuestFeedback(e: React.FormEvent) {
+    e.preventDefault();
+    const name = feedbackForm.guestName.trim();
+    const comment = feedbackForm.comment.trim();
+    const rating = feedbackForm.rating || 0;
+
+    if (name.length < 2) {
+      setFeedbackError('Please enter your name (at least 2 characters).');
+      return;
+    }
+    if (rating < 1 || rating > 5) {
+      setFeedbackError('Please choose a rating between 1 and 5 stars.');
+      return;
+    }
+    if (comment.length < 5) {
+      setFeedbackError('Please share a few words about your experience.');
+      return;
+    }
+
+    setFeedbackError('');
+    setFeedbackBusy(true);
+    try {
+      await api('/public/feedback', {
+        method: 'POST',
+        body: {
+          guestName: name,
+          email: feedbackForm.email.trim(),
+          stayTitle: feedbackForm.stayTitle,
+          rating,
+          comment,
+        },
+      });
+      setFeedbackSubmitted({ guestName: name, rating });
+      setFeedbackForm({
+        guestName: '',
+        email: '',
+        stayTitle: 'Overall Stay',
+        rating: 5,
+        comment: '',
+      });
+      toast.success('Thank you — your experience has been sent to our desk.');
+    } catch (err: any) {
+      const message = err.message || 'Could not submit your feedback right now.';
+      setFeedbackError(message);
+      toast.error(message);
+    } finally {
+      setFeedbackBusy(false);
+    }
   }
 
   const liveActivities: Array<{ image?: string; title: string; body: string }> =
@@ -673,7 +742,165 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* 11. Seasonal Updates / Newsletter */}
+      {/* 11. Guest Feedback */}
+      <section id="guest-feedback" className="mx-auto max-w-7xl px-4 pt-16 sm:px-6 lg:px-8">
+        <Card className="overflow-hidden border-border/80 bg-card/85 shadow-xl backdrop-blur-sm">
+          <div className="grid lg:grid-cols-[0.9fr_1.1fr]">
+            <div className="flex flex-col justify-between bg-[#132038] p-8 text-[#f8f5ee] sm:p-10">
+              <div className="space-y-4">
+                <p className="text-xs font-medium uppercase tracking-[0.2em] text-amber-300">Guest Feedback</p>
+                <h2 className="font-display text-3xl font-semibold leading-tight text-white sm:text-4xl">
+                  Share your Oasis experience
+                </h2>
+                <p className="text-sm leading-relaxed text-white/80">
+                  Stayed at Katpana, dined in our kitchen, or joined a desert bonfire? Tell our management team how your time felt.
+                </p>
+
+                <ul className="space-y-3 pt-2 text-xs text-white/85">
+                  <li className="flex items-start gap-2.5">
+                    <MessageSquareHeart className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+                    <span>Every submission goes straight to our front-desk &amp; management Guest Feedback portal.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <Star className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+                    <span>Approved notes can be featured on the Guest Reviews wall after team review.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+                    <span>No booking code required — share openly as a past guest or visitor.</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="mt-8 border-t border-white/15 pt-5">
+                <Link to="/reviews" className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-300 hover:underline">
+                  Read published guest reviews
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </div>
+
+            <CardContent className="p-6 sm:p-10">
+              {feedbackSubmitted ? (
+                <div className="flex h-full flex-col justify-center space-y-5 py-6">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="h-6 w-6" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="font-display text-3xl font-semibold text-foreground">
+                      Thank you, {feedbackSubmitted.guestName}
+                    </h3>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      Your {feedbackSubmitted.rating}-star experience has been recorded and delivered to the Oasis Guest Feedback desk.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <Button type="button" variant="outline" onClick={() => setFeedbackSubmitted(null)}>
+                      Submit another feedback
+                    </Button>
+                    <Button asChild variant="accent">
+                      <Link to="/reviews">View guest reviews</Link>
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleGuestFeedback} className="space-y-5">
+                  <div className="space-y-1.5">
+                    <Label>Overall Rating *</Label>
+                    <div className="flex flex-wrap items-center gap-3 pt-0.5">
+                      <Rating
+                        name="homepage-guest-rating"
+                        value={feedbackForm.rating}
+                        size="large"
+                        onChange={(_e, val) => setFeedbackForm((p) => ({ ...p, rating: val || 5 }))}
+                      />
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {
+                          ['', 'Needs improvement', 'Fair stay', 'Good experience', 'Very good stay', 'Exceptional experience'][
+                            feedbackForm.rating || 5
+                          ]
+                        }
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="gf-name">Your Name *</Label>
+                      <Input
+                        id="gf-name"
+                        required
+                        maxLength={120}
+                        value={feedbackForm.guestName}
+                        onChange={(e) => setFeedbackForm((p) => ({ ...p, guestName: e.target.value }))}
+                        placeholder="e.g. Bilal Ahmed"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="gf-email">Email (Optional)</Label>
+                      <Input
+                        id="gf-email"
+                        type="email"
+                        maxLength={120}
+                        value={feedbackForm.email}
+                        onChange={(e) => setFeedbackForm((p) => ({ ...p, email: e.target.value }))}
+                        placeholder="For any follow-up from desk"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="gf-highlight">Experience Highlight</Label>
+                    <Select
+                      value={feedbackForm.stayTitle}
+                      onValueChange={(val) => setFeedbackForm((p) => ({ ...p, stayTitle: val }))}
+                    >
+                      <SelectTrigger id="gf-highlight">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Overall Stay">Overall Stay</SelectItem>
+                        <SelectItem value="Glass Desert Huts">Glass Desert Huts</SelectItem>
+                        <SelectItem value="Kitchen & Dining">Kitchen &amp; Dining</SelectItem>
+                        <SelectItem value="Desert Safari & Bonfire">Desert Safari &amp; Bonfire</SelectItem>
+                        <SelectItem value="Hospitality & Service">Hospitality &amp; Service</SelectItem>
+                        <SelectItem value="Winter Heating & Comfort">Winter Heating &amp; Comfort</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="gf-comment">Your Experience *</Label>
+                      <span className="text-[11px] tabular-nums text-muted-foreground">
+                        {feedbackForm.comment.length} / 2000
+                      </span>
+                    </div>
+                    <Textarea
+                      id="gf-comment"
+                      rows={4}
+                      required
+                      maxLength={2000}
+                      value={feedbackForm.comment}
+                      onChange={(e) => setFeedbackForm((p) => ({ ...p, comment: e.target.value }))}
+                      placeholder="How were the heated huts, desert views, dining, or our hospitality?"
+                    />
+                  </div>
+
+                  {feedbackError && <Alert severity="error">{feedbackError}</Alert>}
+
+                  <Button type="submit" variant="accent" size="lg" disabled={feedbackBusy} className="w-full sm:w-auto">
+                    <Send className="h-4 w-4" />
+                    {feedbackBusy ? 'Sending feedback…' : 'Submit Feedback'}
+                  </Button>
+                </form>
+              )}
+            </CardContent>
+          </div>
+        </Card>
+      </section>
+
+      {/* 12. Seasonal Updates / Newsletter */}
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <EnquiryForm
           topic="Newsletter"

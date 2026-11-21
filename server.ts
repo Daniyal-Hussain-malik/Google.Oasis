@@ -11,7 +11,7 @@ process.env.JWT_SECRET ||= 'oasis-resort-skardu-local-runtime-jwt-secret-key-202
 process.env.ADMIN_EMAIL ||= 'admin@oasisresort.pk';
 process.env.ADMIN_PASSWORD ||= 'ChangeMe123!';
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 const HOST = '0.0.0.0';
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
@@ -64,7 +64,8 @@ async function startServer() {
   } else {
     const distDir = path.resolve(ROOT, 'dist');
     app.use(express.static(distDir, { index: false, maxAge: '1h' }));
-    app.get('*', (_req, res) => {
+    app.use((req, res, next) => {
+      if (req.method !== 'GET' && req.method !== 'HEAD') return next();
       res.sendFile(path.join(distDir, 'index.html'));
     });
   }
