@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
+import { injectSeoHtml } from './src/lib/seoData.ts';
 
 // Ensure SQLite local persistence and safe JWT secret before backend modules initialize
 process.env.DB_DIALECT ||= 'sqlite';
@@ -111,15 +112,29 @@ async function startServer() {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: 'spa',
+      appType: 'custom',
     });
     app.use(vite.middlewares);
+    app.use(async (req, res, next) => {
+      if ((req.method !== 'GET' && req.method !== 'HEAD') || path.extname(req.path)) return next();
+      try {
+        const rawTemplate = fs.readFileSync(path.resolve(ROOT, 'index.html'), 'utf-8');
+        const seoTemplate = injectSeoHtml(rawTemplate, req.path, getBaseUrl(req));
+        const html = await vite.transformIndexHtml(req.originalUrl, seoTemplate);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
+      } catch (err) {
+        vite.ssrFixStacktrace(err as Error);
+        next(err);
+      }
+    });
   } else {
     const distDir = path.resolve(ROOT, 'dist');
+    const distTemplate = fs.readFileSync(path.join(distDir, 'index.html'), 'utf-8');
     app.use(express.static(distDir, { index: false, maxAge: '1h' }));
     app.use((req, res, next) => {
-      if (req.method !== 'GET' && req.method !== 'HEAD') return next();
-      res.sendFile(path.join(distDir, 'index.html'));
+      if ((req.method !== 'GET' && req.method !== 'HEAD') || path.extname(req.path)) return next();
+      const html = injectSeoHtml(distTemplate, req.path, getBaseUrl(req));
+      res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
     });
   }
 

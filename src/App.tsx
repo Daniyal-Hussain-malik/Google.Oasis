@@ -6,6 +6,7 @@ import { SiteBackdrop } from '@/src/components/ui/site-backdrop';
 import { GuestLayout } from '@/src/components/guest/GuestLayout';
 import { StaffRole, SUPER, FRONT, FLOOR, useAdminAuth } from '@/src/context/AdminAuthContext';
 import { track } from '@/src/lib/api';
+import { applyDocumentSeo } from '@/src/lib/seo';
 
 // Guest Portal Pages
 import { HomePage } from '@/src/pages/guest/HomePage';
@@ -71,6 +72,7 @@ function ScrollAndTrack() {
   const { pathname } = useLocation();
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    applyDocumentSeo(pathname);
   }, [pathname]);
   return null;
 }

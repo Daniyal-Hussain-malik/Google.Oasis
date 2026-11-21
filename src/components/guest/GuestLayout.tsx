@@ -16,6 +16,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Textarea } from '@/src/components/ui/textarea';
 import { useI18n } from '@/src/context/I18nContext';
 import { useAppTheme } from '@/src/context/ThemeContext';
+import { GlobalSearch } from '@/src/components/guest/GlobalSearch';
+import { SkarduWeatherWidget } from '@/src/components/guest/SkarduWeatherWidget';
 import { track } from '@/src/lib/api';
 import { WHATSAPP_URL } from '@/src/data/resortContent';
 
@@ -113,12 +115,23 @@ export function GuestLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="relative z-10 flex min-h-screen flex-col text-foreground" dir={lang === 'ur' ? 'rtl' : 'ltr'}>
-      {/* Single-row responsive Top Bar with full portal navigation */}
+      {/* Single-row responsive Top Bar with slim Skardu Weather strip & full portal navigation */}
       <header className="sticky top-0 z-40 border-b border-border bg-card/90 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="border-b border-border/60 bg-secondary/35 dark:bg-black/25">
+          <div className="mx-auto flex h-8 max-w-7xl items-center justify-between gap-2 px-4 text-xs sm:px-6 lg:px-8">
+            <span className="hidden sm:inline text-muted-foreground tracking-wide">
+              Katpana Cold Desert · Skardu
+            </span>
+            <span className="sm:hidden text-muted-foreground tracking-wide">
+              Skardu · Katpana
+            </span>
+            <SkarduWeatherWidget variant="topbar" />
+          </div>
+        </div>
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 lg:px-8 xl:gap-4">
           <Link
             to="/"
-            className="font-display text-2xl font-semibold tracking-tight text-foreground whitespace-nowrap shrink-0 transition-opacity hover:opacity-80"
+            className="font-display text-xl xl:text-2xl font-semibold tracking-tight text-foreground whitespace-nowrap shrink-0 transition-opacity hover:opacity-80"
           >
             Oasis Resort
           </Link>
@@ -126,7 +139,7 @@ export function GuestLayout({ children }: { children: React.ReactNode }) {
           <MotionConfig reducedMotion="user">
             <nav
               onMouseLeave={() => setHoveredNav(null)}
-              className="hidden lg:flex h-11 items-center gap-0.5 overflow-hidden rounded-full border border-border/80 bg-secondary/45 px-2.5 text-[13px] font-medium text-muted-foreground shadow-inner backdrop-blur-md dark:border-white/10 dark:bg-[#0b1623]/90"
+              className="hidden lg:flex h-11 items-center gap-0.5 overflow-hidden rounded-full border border-border/80 bg-secondary/45 px-2 text-[13px] font-medium text-muted-foreground shadow-inner backdrop-blur-md xl:px-2.5 dark:border-white/10 dark:bg-[#0b1623]/90"
               aria-label="Main navigation"
             >
               {PRIMARY_LINKS.map((item) => {
@@ -142,7 +155,7 @@ export function GuestLayout({ children }: { children: React.ReactNode }) {
                     onMouseEnter={() => setHoveredNav(item.to)}
                     onFocus={() => setHoveredNav(item.to)}
                     onBlur={() => setHoveredNav(null)}
-                    className={`relative flex h-full items-center px-3 xl:px-3.5 whitespace-nowrap shrink-0 transition-colors duration-150 ${
+                    className={`relative flex h-full items-center px-2 xl:px-3.5 whitespace-nowrap shrink-0 transition-colors duration-150 ${
                       active ? 'text-foreground font-semibold' : lit ? 'text-foreground' : 'hover:text-foreground'
                     }`}
                   >
@@ -159,7 +172,7 @@ export function GuestLayout({ children }: { children: React.ReactNode }) {
                     onMouseEnter={() => setHoveredNav('__more__')}
                     onFocus={() => setHoveredNav('__more__')}
                     onBlur={() => setHoveredNav(null)}
-                    className={`relative flex h-full items-center gap-1 px-3 xl:px-3.5 whitespace-nowrap shrink-0 transition-colors duration-150 cursor-pointer ${
+                    className={`relative flex h-full items-center gap-1 px-2 xl:px-3.5 whitespace-nowrap shrink-0 transition-colors duration-150 cursor-pointer ${
                       moreActive
                         ? 'text-foreground font-semibold'
                         : spotlightTarget === '__more__'
@@ -195,7 +208,10 @@ export function GuestLayout({ children }: { children: React.ReactNode }) {
             </nav>
           </MotionConfig>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="w-36 sm:w-auto">
+              <GlobalSearch variant="desktop" />
+            </div>
             <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex whitespace-nowrap">
               <Link to="/order">Order Food</Link>
             </Button>
@@ -209,12 +225,19 @@ export function GuestLayout({ children }: { children: React.ReactNode }) {
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="flex flex-col justify-between overflow-y-auto">
+              <SheetContent
+                side="right"
+                onOpenAutoFocus={(e) => {
+                  e.preventDefault();
+                  (e.currentTarget as HTMLElement).focus();
+                }}
+                className="flex flex-col justify-between overflow-y-auto"
+              >
                 <div>
                   <SheetHeader>
                     <SheetTitle className="font-display text-2xl font-semibold">Oasis Resort Skardu</SheetTitle>
                   </SheetHeader>
-                  <nav className="mt-6 flex flex-col gap-1">
+                  <nav className="mt-5 flex flex-col gap-1" aria-label="Mobile navigation">
                     <Link
                       to="/"
                       onClick={() => setMobileOpen(false)}
@@ -235,6 +258,7 @@ export function GuestLayout({ children }: { children: React.ReactNode }) {
                   </nav>
                 </div>
                 <div className="mt-6 space-y-3 border-t border-border pt-4">
+                  <SkarduWeatherWidget variant="sheet" />
                   <div className="flex items-center justify-between gap-2">
                     <Button variant="outline" size="sm" onClick={toggle} className="flex-1">
                       <Globe className="h-4 w-4" />

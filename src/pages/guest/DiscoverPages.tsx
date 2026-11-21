@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { Alert } from '@mui/material';
 import { ArrowLeft, BadgeCheck, PenLine, Search } from 'lucide-react';
 import { toast } from 'sonner';
@@ -13,6 +13,7 @@ import { Input } from '@/src/components/ui/input';
 import { Label } from '@/src/components/ui/label';
 import { Textarea } from '@/src/components/ui/textarea';
 import { api, media, pkr } from '@/src/lib/api';
+import { applyDocumentSeo } from '@/src/lib/seo';
 import {
   collections,
   EditorialItem,
@@ -395,10 +396,22 @@ function GuestJournalComposer() {
 
 export function DetailPage({ kind }: { kind: keyof typeof KIND_MAP }) {
   const { slug } = useParams();
+  const { pathname } = useLocation();
   const meta = KIND_MAP[kind];
   const [item, setItem] = useState<EditorialItem | null>(
     () => meta.items.find((i) => i.slug === slug) || null,
   );
+
+  useEffect(() => {
+    if (!item) return;
+    applyDocumentSeo(pathname, {
+      title: `${item.title} — Oasis Resort Skardu`,
+      description: item.summary,
+      image: item.image || undefined,
+      imageAlt: item.title,
+      type: 'article',
+    });
+  }, [item, pathname]);
 
   useEffect(() => {
     const localHit = meta.items.find((i) => i.slug === slug);

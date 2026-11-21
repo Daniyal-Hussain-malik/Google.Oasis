@@ -17,6 +17,129 @@ import { equalsNoCase } from '../utils/sql.js';
 
 const router = Router();
 
+const SKARDU_WEATHER_URL =
+  'https://api.open-meteo.com/v1/forecast?latitude=35.335&longitude=75.616&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,is_day&daily=temperature_2m_max,temperature_2m_min&timezone=Asia%2FKarachi';
+const WEATHER_CACHE_TTL_MS = 15 * 60 * 1000;
+let weatherCache = { data: null, fetchedAt: 0 };
+
+function describeSkarduWeather(code, isDay, tempC, windKmh) {
+  const numeric = Number(code);
+  let label = 'Clear sky';
+  let category = 'clear';
+
+  if (numeric === 0) {
+    label = isDay ? 'Clear sky' : 'Clear night';
+    category = 'clear';
+  } else if (numeric === 1 || numeric === 2) {
+    label = 'Partly cloudy';
+    category = 'partly_cloudy';
+  } else if (numeric === 3) {
+    label = 'Overcast';
+    category = 'cloudy';
+  } else if (numeric === 45 || numeric === 48) {
+    label = 'Valley mist';
+    category = 'fog';
+  } else if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(numeric)) {
+    label = numeric >= 63 || numeric >= 81 ? 'Rain showers' : 'Light rain';
+    category = 'rain';
+  } else if ([71, 73, 75, 77, 85, 86].includes(numeric)) {
+    label = 'Snowfall';
+    category = 'snow';
+  } else if ([95, 96, 99].includes(numeric)) {
+    label = 'Mountain storm';
+    category = 'storm';
+  }
+
+  let plannerTip = 'Clear mountain visibility — great window for Katpana dune walks, jeep safaris, and sunset photos.';
+  if (category === 'snow') {
+    plannerTip = 'Fresh desert snow weather — warm up in heated huts with Kashmiri chai and check highway advisories before long drives.';
+  } else if (category === 'storm' || category === 'rain') {
+    plannerTip = 'Passing valley showers — ideal for cozying up in the dining hall or planning short flexible lake excursions.';
+  } else if (category === 'fog') {
+    plannerTip = 'Morning mist across the Indus valley — late morning offers clearer views across Katpana and Shangrila.';
+  } else if (windKmh >= 24) {
+    plannerTip = 'Brisk winds over the Katpana dunes — best for sheltered valley walks early; secure scarves for sunset viewing.';
+  } else if (category === 'partly_cloudy' || category === 'cloudy') {
+    plannerTip = 'Soft mountain cloud cover — comfortable glare-free light for cycling, Deosai enquiries, and dusk bonfire.';
+  } else if (!isDay) {
+    plannerTip = 'Clear Skardu night sky — bundle up for desert stargazing around the evening bonfire.';
+  }
+
+  let clothingTip = 'Light jacket by day, warm layer after dusk';
+  if (tempC <= 2) clothingTip = 'Heavy winter parka, gloves & thermal layers';
+  else if (tempC <= 10) clothingTip = 'Warm down jacket or fleece recommended';
+  else if (tempC <= 18) clothingTip = 'Layered sweater or windbreaker for breezy dunes';
+  else clothingTip = 'Breathable cotton by midday, light jacket at night';
+
+  return { label, category, plannerTip, clothingTip };
+}
+
+router.get('/weather', async (req, res) => {
+  const forceRefresh = req.query.refresh === '1';
+  const now = Date.now();
+  if (!forceRefresh && weatherCache.data && now - weatherCache.fetchedAt < WEATHER_CACHE_TTL_MS) {
+    return res.json({ ...weatherCache.data, cached: true });
+  }
+
+  try {
+    const upstream = await fetch(SKARDU_WEATHER_URL, {
+      signal: AbortSignal.timeout(5000),
+      headers: { Accept: 'application/json' },
+    });
+    if (!upstream.ok) {
+      throw new Error(`Open-Meteo HTTP ${upstream.status}`);
+    }
+    const raw = await upstream.json();
+    const cur = raw?.current;
+    if (!cur || typeof cur.temperature_2m !== 'number') {
+      throw new Error('Unexpected weather payload');
+    }
+
+    const tempC = Math.round(cur.temperature_2m);
+    const feelsLikeC = Math.round(cur.apparent_temperature ?? cur.temperature_2m);
+    const windKmh = Math.round(cur.wind_speed_10m ?? 0);
+    const humidity = Math.round(cur.relative_humidity_2m ?? 0);
+    const isDay = Boolean(cur.is_day);
+    const highC = typeof raw?.daily?.temperature_2m_max?.[0] === 'number'
+      ? Math.round(raw.daily.temperature_2m_max[0])
+      : tempC;
+    const lowC = typeof raw?.daily?.temperature_2m_min?.[0] === 'number'
+      ? Math.round(raw.daily.temperature_2m_min[0])
+      : tempC;
+
+    const summary = describeSkarduWeather(cur.weather_code, isDay, tempC, windKmh);
+
+    const payload = {
+      location: 'Skardu · Katpana Desert',
+      elevationM: Math.round(raw.elevation ?? 2228),
+      tempC,
+      feelsLikeC,
+      highC,
+      lowC,
+      windKmh,
+      humidity,
+      isDay,
+      weatherCode: cur.weather_code,
+      condition: summary.label,
+      category: summary.category,
+      plannerTip: summary.plannerTip,
+      clothingTip: summary.clothingTip,
+      observedAt: cur.time || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    weatherCache = { data: payload, fetchedAt: now };
+    return res.json({ ...payload, cached: false });
+  } catch (err) {
+    if (weatherCache.data) {
+      return res.json({ ...weatherCache.data, cached: true, stale: true });
+    }
+    return res.status(503).json({
+      message: 'Live Skardu weather is temporarily unavailable.',
+    });
+  }
+});
+
 router.get('/hotel', async (req, res) => {
   const settings = await Settings.current();
   res.json({
