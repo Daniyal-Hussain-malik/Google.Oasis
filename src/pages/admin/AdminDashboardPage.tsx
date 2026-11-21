@@ -1,19 +1,95 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Alert, LinearProgress, Skeleton } from '@mui/material';
-import { MoonStar, RefreshCw } from 'lucide-react';
+import { MoonStar, RefreshCw, TrendingUp } from 'lucide-react';
+import {
+  Area,
+  Bar,
+  CartesianGrid,
+  ComposedChart,
+  Legend,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { toast } from 'sonner';
 import { AdminLayout } from '@/src/pages/admin/AdminLayout';
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { SUPER, useAdminAuth } from '@/src/context/AdminAuthContext';
-import { adminApi, pkr, pretty } from '@/src/lib/api';
+import { addDays, adminApi, pkr, pretty, todayISO } from '@/src/lib/api';
+
+type TrendRange = '7d' | '14d' | '30d';
+
+interface TrendPoint {
+  date: string;
+  label: string;
+  bookedRooms: number;
+  checkIns: number;
+  occupancy: number;
+  revenue: number;
+}
+
+function shortDayLabel(iso: string): string {
+  const parts = iso.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return iso;
+  return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2])).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+function BookingTrendsTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: TrendPoint }>;
+}) {
+  if (!active || !payload?.length) return null;
+  const pt = payload[0].payload;
+  return (
+    <div className="rounded-lg border border-border bg-card/95 p-3 text-xs shadow-lg backdrop-blur-sm">
+      <p className="font-semibold text-foreground">{pretty(pt.date)}</p>
+      <div className="mt-1.5 space-y-1 tabular-nums">
+        <p className="flex items-center justify-between gap-4 text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[#d97724]" />
+            Booked Rooms
+          </span>
+          <span className="font-mono font-semibold text-foreground">
+            {pt.bookedRooms} ({pt.occupancy}%)
+          </span>
+        </p>
+        <p className="flex items-center justify-between gap-4 text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[#0ea5e9]" />
+            New Check-ins
+          </span>
+          <span className="font-mono font-semibold text-foreground">{pt.checkIns}</span>
+        </p>
+        <p className="flex items-center justify-between gap-4 text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[#10b981]" />
+            Room Revenue
+          </span>
+          <span className="font-mono font-semibold text-foreground">{pkr(pt.revenue)}</span>
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export function AdminDashboardPage() {
   const { can } = useAdminAuth();
   const [data, setData] = useState<any>(null);
   const [occ, setOcc] = useState<any>(null);
+  const [reservations, setReservations] = useState<any[]>([]);
+  const [trendRange, setTrendRange] = useState<TrendRange>('14d');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [auditing, setAuditing] = useState(false);
@@ -22,12 +98,14 @@ export function AdminDashboardPage() {
     setLoading(true);
     setError('');
     try {
-      const [d, o] = await Promise.all([
+      const [d, o, resList] = await Promise.all([
         adminApi('/admin/dashboard'),
         adminApi('/admin/occupancy?days=30'),
+        adminApi<{ items?: any[] }>('/admin/reservations?limit=200').catch(() => ({ items: [] })),
       ]);
       setData(d);
       setOcc(o);
+      setReservations(Array.isArray(resList?.items) ? resList.items : []);
     } catch (err: any) {
       setError(err.message || 'Could not load dashboard');
     } finally {
@@ -38,6 +116,55 @@ export function AdminDashboardPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const bookingTrends = useMemo<TrendPoint[]>(() => {
+    const baseDate = data?.businessDate || occ?.from || todayISO();
+    const totalRooms = Number(data?.rooms) || 19;
+    const occMap = new Map<string, any>((occ?.series || []).map((row: any) => [row.date, row]));
+    const activeReservations = reservations.filter((r) => r.status !== 'cancelled');
+
+    const [startOffset, totalDays] =
+      trendRange === '7d' ? [-3, 7] : trendRange === '14d' ? [-6, 14] : [-6, 30];
+
+    return Array.from({ length: totalDays }, (_, idx) => {
+      const date = addDays(baseDate, startOffset + idx);
+      const occDay = occMap.get(date);
+
+      let resRooms = 0;
+      let checkIns = 0;
+      let resRevenue = 0;
+
+      for (const r of activeReservations) {
+        if (r.checkIn === date) checkIns += 1;
+        if (r.checkIn && r.checkOut && r.checkIn <= date && date < r.checkOut) {
+          const roomCount = Math.max(Array.isArray(r.rooms) ? r.rooms.length : 1, 1);
+          resRooms += roomCount;
+          const stayNights = Math.max(Number(r.nights) || 1, 1);
+          resRevenue += (Number(r.totalAmount) || 0) / stayNights;
+        }
+      }
+
+      const bookedRooms = Math.max(resRooms, Number(occDay?.sold) || 0);
+      const revenue = Math.round(Math.max(resRevenue, Number(occDay?.revenue) || 0));
+      const occupancy = totalRooms > 0 ? Math.min(100, Math.round((bookedRooms / totalRooms) * 100)) : 0;
+
+      return {
+        date,
+        label: shortDayLabel(date),
+        bookedRooms,
+        checkIns,
+        occupancy,
+        revenue,
+      };
+    });
+  }, [data?.businessDate, data?.rooms, occ?.from, occ?.series, reservations, trendRange]);
+
+  const trendSummary = useMemo(() => {
+    const totalCheckIns = bookingTrends.reduce((sum, pt) => sum + pt.checkIns, 0);
+    const totalRevenue = bookingTrends.reduce((sum, pt) => sum + pt.revenue, 0);
+    const peakBooked = bookingTrends.reduce((max, pt) => Math.max(max, pt.bookedRooms), 0);
+    return { totalCheckIns, totalRevenue, peakBooked };
+  }, [bookingTrends]);
 
   async function quickStatus(id: string | number, status: 'checked_in' | 'checked_out') {
     try {
@@ -156,6 +283,119 @@ export function AdminDashboardPage() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Booking Trends (Recharts) */}
+            <Card>
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <TrendingUp className="h-4 w-4 text-accent" />
+                    Booking Trends
+                  </CardTitle>
+                  <CardDescription>
+                    Booked rooms, daily check-ins, and projected room revenue across active reservations
+                  </CardDescription>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="hidden items-center gap-4 text-xs text-muted-foreground xl:flex">
+                    <span>
+                      Check-ins: <strong className="font-mono text-foreground">{trendSummary.totalCheckIns}</strong>
+                    </span>
+                    <span>
+                      Peak Rooms: <strong className="font-mono text-foreground">{trendSummary.peakBooked}</strong>
+                    </span>
+                    <span>
+                      Window Revenue: <strong className="font-mono text-foreground">{pkr(trendSummary.totalRevenue)}</strong>
+                    </span>
+                  </div>
+                  <div className="inline-flex rounded-lg border border-border bg-secondary/40 p-0.5 text-xs">
+                    {(['7d', '14d', '30d'] as TrendRange[]).map((range) => (
+                      <button
+                        key={range}
+                        type="button"
+                        onClick={() => setTrendRange(range)}
+                        className={`rounded-md px-2.5 py-1 font-mono uppercase transition-colors cursor-pointer ${
+                          trendRange === range
+                            ? 'bg-card font-semibold text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        {range}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={bookingTrends} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="oasisBookingAmber" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#d97724" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#d97724" stopOpacity={0.03} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                      <XAxis
+                        dataKey="label"
+                        tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                        tickLine={false}
+                        axisLine={false}
+                        minTickGap={16}
+                      />
+                      <YAxis
+                        yAxisId="left"
+                        allowDecimals={false}
+                        tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                        tickLine={false}
+                        axisLine={false}
+                        width={32}
+                      />
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
+                        width={44}
+                      />
+                      <Tooltip content={<BookingTrendsTooltip />} />
+                      <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
+                      <Area
+                        yAxisId="left"
+                        type="monotone"
+                        dataKey="bookedRooms"
+                        name="Booked Rooms"
+                        stroke="#d97724"
+                        strokeWidth={2.5}
+                        fill="url(#oasisBookingAmber)"
+                      />
+                      <Bar
+                        yAxisId="left"
+                        dataKey="checkIns"
+                        name="Check-ins"
+                        fill="#0ea5e9"
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={20}
+                      />
+                      <Line
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="revenue"
+                        name="Revenue (PKR)"
+                        stroke="#10b981"
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Today's Arrivals & Departures */}
             <div className="grid gap-6 lg:grid-cols-2">
