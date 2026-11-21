@@ -4,6 +4,7 @@ import { Alert } from '@mui/material';
 import { LogOut, RefreshCw, UtensilsCrossed } from 'lucide-react';
 import { GuestLayout } from '@/src/components/guest/GuestLayout';
 import { FacilityShowcase } from '@/src/components/guest/FacilitySection';
+import { LoyaltyPanel } from '@/src/components/guest/LoyaltyPanel';
 import { PaymentAccounts, PaymentProofForm } from '@/src/components/guest/PaymentSection';
 import { Button } from '@/src/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card';
@@ -134,7 +135,14 @@ export function GuestPortalPage() {
           <div className="space-y-8">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="font-mono text-xs font-medium text-accent">{booking.bookingNumber}</p>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <p className="font-mono text-xs font-medium text-accent">{booking.bookingNumber}</p>
+                  {booking.loyalty && (
+                    <span className="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-accent">
+                      {booking.loyalty.availablePoints.toLocaleString()} pts · {booking.loyalty.tier.name}
+                    </span>
+                  )}
+                </div>
                 <h1 className="font-display mt-1 text-4xl font-semibold">Hello, {booking.guestName}</h1>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -191,6 +199,12 @@ export function GuestPortalPage() {
                       <span className="font-mono tabular-nums text-foreground">{pkr(booking.extras)}</span>
                     </div>
                   )}
+                  {booking.extras < 0 && (
+                    <div className="flex justify-between">
+                      <span>Loyalty & Folio Credits</span>
+                      <span className="font-mono tabular-nums text-emerald-600">−{pkr(Math.abs(booking.extras))}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span>Paid</span>
                     <span className="font-mono tabular-nums text-emerald-600">{pkr(booking.paid)}</span>
@@ -198,6 +212,17 @@ export function GuestPortalPage() {
                 </CardContent>
               </Card>
             </div>
+
+            {booking.loyalty && creds?.phone && (
+              <LoyaltyPanel
+                loyalty={booking.loyalty}
+                bookingNumber={booking.bookingNumber}
+                phone={creds.phone}
+                onRedeemed={({ booking: updatedBooking, loyalty: updatedLoyalty }) =>
+                  setBooking({ ...updatedBooking, loyalty: updatedLoyalty })
+                }
+              />
+            )}
 
             {booking.balance > 0 && booking.status !== 'cancelled' && (
               <Card>

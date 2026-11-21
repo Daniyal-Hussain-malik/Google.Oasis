@@ -15,6 +15,7 @@ import './BlogPost.js';
 import './Feedback.js';
 import './Enquiry.js';
 import './Insight.js';
+import './Loyalty.js';
 import './Settings.js';
 
 export { sequelize } from '../config/db.js';

@@ -10,6 +10,7 @@ import Reservation from '../models/Reservation.js';
 import RoomType from '../models/RoomType.js';
 import Settings from '../models/Settings.js';
 import { availability, createReservation, readStay } from '../services/booking.js';
+import { buildLoyaltySummary, redeemLoyaltyReward, syncLoyaltyForGuest } from '../services/loyalty.js';
 import { bookingCreated, enquiryCreated, feedbackReceived } from '../services/notifications.js';
 import { todayIn } from '../utils/dates.js';
 import { badRequest, int, isEmail, notFound, phoneKey, text } from '../utils/http.js';
@@ -238,6 +239,7 @@ router.post('/reservations', formLimit, async (req, res) => {
     paymentChoice: 'hotel',
   });
   bookingCreated(reservation);
+  await syncLoyaltyForGuest(reservation.guest.phoneKey).catch(() => {});
   res.status(201).json(reservation.toPublic());
 });
 
@@ -253,7 +255,25 @@ export async function findGuestBooking(body) {
 
 router.post('/reservations/lookup', formLimit, async (req, res) => {
   const reservation = await findGuestBooking(req.body || {});
-  res.json(reservation.toPublic());
+  const loyalty = await buildLoyaltySummary(reservation);
+  res.json({ ...reservation.toPublic(), loyalty });
+});
+
+router.post('/loyalty/summary', formLimit, async (req, res) => {
+  const reservation = await findGuestBooking(req.body || {});
+  const loyalty = await buildLoyaltySummary(reservation);
+  res.json(loyalty);
+});
+
+router.post('/loyalty/redeem', formLimit, async (req, res) => {
+  const body = req.body || {};
+  const reservation = await findGuestBooking(body);
+  const result = await redeemLoyaltyReward(reservation.id, {
+    rewardKey: body.rewardKey,
+    note: body.note,
+    clientRequestId: body.clientRequestId,
+  });
+  res.status(result.duplicate ? 200 : 201).json({ ok: true, ...result });
 });
 
 router.post('/feedback', formLimit, async (req, res) => {
